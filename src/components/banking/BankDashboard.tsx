@@ -1,0 +1,226 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { PurePulseTheme } from '../../theme/theme';
+import { VirtualCardView } from './VirtualCardView';
+import { TierProgression } from './TierProgression';
+import { StripePayoutModal } from './StripePayoutModal';
+import { initialUserProfile, initialBankingAccount, samplePayoutLedger } from '../../services/mockData';
+import { PayoutTransaction } from '../../types';
+
+export const BankDashboard: React.FC = () => {
+  const [profile, setProfile] = useState(initialUserProfile);
+  const [account, setAccount] = useState(initialBankingAccount);
+  const [ledger, setLedger] = useState<PayoutTransaction[]>(samplePayoutLedger);
+  const [payoutModalVisible, setPayoutModalVisible] = useState(false);
+
+  const handleCashoutSuccess = (cashoutAmount: number) => {
+    const newTx: PayoutTransaction = {
+      id: `tx-${Math.floor(1000 + Math.random() * 9000)}`,
+      amount: cashoutAmount,
+      status: 'Completed',
+      date: 'Just now',
+      destination: 'Stripe Instant Cashout'
+    };
+    setAccount({
+      ...account,
+      availableBalance: 0.00,
+      lifetimeEarnings: account.lifetimeEarnings + cashoutAmount
+    });
+    setLedger([newTx, ...ledger]);
+  };
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentList} showsVerticalScrollIndicator={false}>
+      {/* Header Banner */}
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.headerTitle}>PurePulse Partner Bank</Text>
+          <Text style={styles.headerSub}>DoorDash-style Instant Cashout & Stripe Payouts</Text>
+        </View>
+        <TouchableOpacity style={styles.cashoutBtn} onPress={() => setPayoutModalVisible(true)}>
+          <Ionicons name="flash" size={16} color="#FFF" />
+          <Text style={styles.cashoutBtnText}>Cash Out</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Interactive Card Component */}
+      <VirtualCardView profile={profile} availableBalance={account.availableBalance} />
+
+      {/* Metric Counters Grid */}
+      <View style={styles.metricsGrid}>
+        <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>ACCRUING MRR</Text>
+          <Text style={styles.metricValue}>${account.monthlyRecurring.toFixed(2)}/mo</Text>
+          <Text style={styles.metricSub}>{account.activeClientsCount} Paying Clients</Text>
+        </View>
+
+        <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>PENDING COMMISSIONS</Text>
+          <Text style={styles.metricValue}>${account.pendingCommissions.toFixed(2)}</Text>
+          <Text style={styles.metricSub}>Clears 1st of month</Text>
+        </View>
+
+        <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>LIFETIME PAID OUT</Text>
+          <Text style={styles.metricValue}>${account.lifetimeEarnings.toFixed(2)}</Text>
+          <Text style={styles.metricSub}>Stripe Express</Text>
+        </View>
+
+        <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>LINK CLICKS</Text>
+          <Text style={styles.metricValue}>{account.linkClicksCount}</Text>
+          <Text style={styles.metricSub}>3.2% Conversion</Text>
+        </View>
+      </View>
+
+      {/* Tier Gamification Ladder */}
+      <TierProgression profile={profile} account={account} />
+
+      {/* Payout History Ledger */}
+      <View style={styles.ledgerSection}>
+        <Text style={styles.ledgerTitle}>Recent Payout History</Text>
+        {ledger.map((tx: PayoutTransaction) => (
+          <View key={tx.id} style={styles.ledgerRow}>
+            <View style={styles.txIconContainer}>
+              <Ionicons name="arrow-up-circle-outline" size={22} color={PurePulseTheme.colors.success} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.txDestination}>{tx.destination}</Text>
+              <Text style={styles.txDate}>{tx.date}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.txAmount}>+${tx.amount.toFixed(2)}</Text>
+              <Text style={styles.txStatus}>{tx.status}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* Stripe Cashout Modal */}
+      <StripePayoutModal
+        visible={payoutModalVisible}
+        onClose={() => setPayoutModalVisible(false)}
+        availableBalance={account.availableBalance}
+        onCashoutSuccess={handleCashoutSuccess}
+      />
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: PurePulseTheme.colors.background,
+  },
+  contentList: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  headerTitle: {
+    ...PurePulseTheme.typography.h2,
+    fontSize: 20,
+  },
+  headerSub: {
+    ...PurePulseTheme.typography.caption,
+    marginTop: 2,
+  },
+  cashoutBtn: {
+    backgroundColor: PurePulseTheme.colors.success,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: PurePulseTheme.radii.md,
+    gap: 4,
+  },
+  cashoutBtnText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginVertical: 12,
+  },
+  metricCard: {
+    flex: 1,
+    minWidth: '47%',
+    backgroundColor: PurePulseTheme.colors.cardBg,
+    padding: 14,
+    borderRadius: PurePulseTheme.radii.lg,
+    borderWidth: 1,
+    borderColor: PurePulseTheme.colors.cardBorder,
+  },
+  metricLabel: {
+    color: PurePulseTheme.colors.textMuted,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  metricValue: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '800',
+    marginVertical: 4,
+  },
+  metricSub: {
+    color: PurePulseTheme.colors.textSecondary,
+    fontSize: 11,
+  },
+  ledgerSection: {
+    backgroundColor: PurePulseTheme.colors.cardBg,
+    borderRadius: PurePulseTheme.radii.lg,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: PurePulseTheme.colors.cardBorder,
+    marginTop: 8,
+  },
+  ledgerTitle: {
+    ...PurePulseTheme.typography.h3,
+    fontSize: 15,
+    marginBottom: 12,
+  },
+  ledgerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: PurePulseTheme.colors.cardBorder,
+  },
+  txIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  txDestination: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  txDate: {
+    color: PurePulseTheme.colors.textMuted,
+    fontSize: 11,
+  },
+  txAmount: {
+    color: PurePulseTheme.colors.success,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  txStatus: {
+    color: PurePulseTheme.colors.textSecondary,
+    fontSize: 10,
+  }
+});

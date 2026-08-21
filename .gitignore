@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p12
+*.key
+*.pem
+.DS_Store
