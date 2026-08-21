@@ -39,16 +39,31 @@ export const ChannelFeed: React.FC = () => {
   };
 
   const toggleLike = (id: string) => {
-    setMessages(
-      messages.map((m) => {
+    setMessages((prev) =>
+      prev.map((m) => {
         if (m.id === id) {
+          const nextLiked = !m.hasLiked;
           return {
             ...m,
-            hasLiked: !m.hasLiked,
-            likesCount: m.hasLiked ? m.likesCount - 1 : m.likesCount + 1,
+            hasLiked: nextLiked,
+            likesCount: Math.max(0, nextLiked ? m.likesCount + 1 : m.likesCount - 1),
           };
         }
         return m;
+      })
+    );
+  };
+
+  const toggleForumLike = (id: string) => {
+    setForumPosts((prev) =>
+      prev.map((p) => {
+        if (p.id === id) {
+          return {
+            ...p,
+            likesCount: p.likesCount + 1,
+          };
+        }
+        return p;
       })
     );
   };
@@ -140,6 +155,9 @@ export const ChannelFeed: React.FC = () => {
               placeholderTextColor={PurePulseTheme.colors.textMuted}
               value={inputText}
               onChangeText={setInputText}
+              maxLength={500}
+              returnKeyType="send"
+              onSubmitEditing={sendMessage}
             />
             <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
               <Ionicons name="send" size={16} color="#FFF" />
@@ -195,8 +213,13 @@ export const ChannelFeed: React.FC = () => {
                 <View style={styles.forumStats}>
                   <Ionicons name="chatbox-ellipses-outline" size={14} color={PurePulseTheme.colors.textMuted} />
                   <Text style={styles.statText}>{post.repliesCount}</Text>
-                  <Ionicons name="heart-outline" size={14} color={PurePulseTheme.colors.textMuted} style={{ marginLeft: 8 }} />
-                  <Text style={styles.statText}>{post.likesCount}</Text>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}
+                    onPress={() => toggleForumLike(post.id)}
+                  >
+                    <Ionicons name="heart-outline" size={14} color={PurePulseTheme.colors.primaryLight} />
+                    <Text style={[styles.statText, { color: PurePulseTheme.colors.primaryLight }]}>{post.likesCount}</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>

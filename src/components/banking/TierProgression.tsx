@@ -34,10 +34,10 @@ export const TierProgression: React.FC<Props> = ({ profile, account }) => {
       <View style={styles.progressContainer}>
         <View style={styles.progressLabels}>
           <Text style={styles.progressTextLeft}>{account.activeClientsCount} Active Client Referrals</Text>
-          <Text style={styles.progressTextRight}>{profile.tierProgress}% to Next Tier</Text>
+          <Text style={styles.progressTextRight}>{Math.min(100, Math.max(0, profile.tierProgress))}% to Next Tier</Text>
         </View>
         <View style={styles.progressBarTrack}>
-          <View style={[styles.progressBarFill, { width: `${profile.tierProgress}%` }]} />
+          <View style={[styles.progressBarFill, { width: `${Math.min(100, Math.max(0, profile.tierProgress))}%` }]} />
         </View>
         <Text style={styles.nextGoalSub}>{account.nextTierGoal}</Text>
       </View>

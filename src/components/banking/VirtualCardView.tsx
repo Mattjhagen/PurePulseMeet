@@ -11,7 +11,7 @@ interface Props {
 }
 
 export const VirtualCardView: React.FC<Props> = ({ profile, availableBalance }) => {
-  const getGradientForTier = (tier: string) => {
+  const getGradientForTier = (tier: string): readonly [string, string, ...string[]] => {
     switch (tier) {
       case 'PurePulse Black Card':
         return ['#111827', '#1F2937', '#581C87'];

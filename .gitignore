@@ -1,9 +1,42 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Expo & EAS
 .expo/
 dist/
-npm-debug.*
+web-build/
+.eas/
+eas-build/
+
+# Native builds & prebuild
+ios/
+android/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Keystores, Certificates & Private Keys
 *.jks
 *.p12
 *.key
 *.pem
+*.keystore
+*.cer
+*.crt
+*.p8
+*.mobileprovision
+
+# Debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS files
 .DS_Store
+*.local
+Thumbs.db
+

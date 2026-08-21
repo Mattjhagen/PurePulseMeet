@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PurePulseTheme } from '../../theme/theme';
@@ -13,6 +13,18 @@ interface Props {
 export const StripePayoutModal: React.FC<Props> = ({ visible, onClose, availableBalance, onCashoutSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [payoutMethod, setPayoutMethod] = useState<'instant' | 'standard'>('instant');
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  const fee = payoutMethod === 'instant' ? availableBalance * 0.01 : 0;
+  const netAmount = Math.max(0, availableBalance - fee);
 
   const executeCashout = () => {
     if (availableBalance <= 0) {
@@ -21,12 +33,12 @@ export const StripePayoutModal: React.FC<Props> = ({ visible, onClose, available
     }
 
     setLoading(true);
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       setLoading(false);
-      onCashoutSuccess(availableBalance);
+      onCashoutSuccess(netAmount);
       Alert.alert(
         '⚡ Instant Payout Initiated!',
-        `$${availableBalance.toFixed(2)} has been sent via Stripe Connect Express to your debit card/bank account.`
+        `$${netAmount.toFixed(2)} (${payoutMethod === 'instant' ? 'after 1% instant fee' : 'standard deposit'}) has been sent via Stripe Connect Express to your account.`
       );
       onClose();
     }, 1500);
@@ -87,9 +99,9 @@ export const StripePayoutModal: React.FC<Props> = ({ visible, onClose, available
 
           {/* Cashout Button */}
           <TouchableOpacity
-            style={[styles.cashoutSubmitBtn, loading && { opacity: 0.7 }]}
+            style={[styles.cashoutSubmitBtn, (loading || availableBalance <= 0) && styles.cashoutSubmitBtnDisabled]}
             onPress={executeCashout}
-            disabled={loading}
+            disabled={loading || availableBalance <= 0}
           >
             {loading ? (
               <ActivityIndicator color="#FFF" />
@@ -97,7 +109,9 @@ export const StripePayoutModal: React.FC<Props> = ({ visible, onClose, available
               <>
                 <Ionicons name="flash" size={18} color="#FFF" />
                 <Text style={styles.cashoutSubmitText}>
-                  Cash Out ${availableBalance.toFixed(2)} Now
+                  {availableBalance <= 0
+                    ? 'No Funds Available'
+                    : `Cash Out $${netAmount.toFixed(2)} Now`}
                 </Text>
               </>
             )}
@@ -216,6 +230,10 @@ const styles = StyleSheet.create({
     borderRadius: PurePulseTheme.radii.md,
     marginTop: 10,
     gap: 8,
+  },
+  cashoutSubmitBtnDisabled: {
+    backgroundColor: PurePulseTheme.colors.cardBgSecondary,
+    opacity: 0.6,
   },
   cashoutSubmitText: {
     color: '#FFF',

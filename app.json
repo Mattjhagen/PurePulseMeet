@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PurePulse Partner Hub",
-    "slug": "purepulse-affiliate-app",
+    "slug": "purepulse-meet",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -34,6 +34,12 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c05c8596-193d-411a-a421-541397598e1b"
+      }
+    },
+    "owner": "purepulse-affiliates"
   }
 }

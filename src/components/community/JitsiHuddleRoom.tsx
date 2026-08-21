@@ -116,6 +116,12 @@ export const JitsiHuddleRoom: React.FC = () => {
                 mediaPlaybackRequiresUserAction={false}
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
+                originWhitelist={['https://meet.jit.si*', 'https://*.jit.si*']}
+                allowFileAccess={false}
+                allowUniversalAccessFromFileURLs={false}
+                mediaCapturePermissionGrantType="grant"
+                setSupportMultipleWindows={false}
+                mixedContentMode="never"
               />
             </View>
 
@@ -141,7 +147,7 @@ export const JitsiHuddleRoom: React.FC = () => {
                 style={styles.controlBtn}
                 onPress={() => Alert.alert('Hand Raised', 'Your hand has been raised for coaching questions!')}
               >
-                <Ionicons name="hand-raised-outline" size={20} color="#FFF" />
+                <Ionicons name="hand-left-outline" size={20} color="#FFF" />
                 <Text style={styles.controlLabel}>Raise Hand</Text>
               </TouchableOpacity>
 
