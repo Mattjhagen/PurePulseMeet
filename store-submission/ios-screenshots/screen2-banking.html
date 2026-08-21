@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Screen 2 - Instant Partner Banking</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #0B0F19;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #FFF;
+    }
+    .device-container {
+      width: 390px;
+      height: 844px;
+      background: #111827;
+      border-radius: 44px;
+      border: 10px solid #1F2937;
+      box-shadow: 0 25px 50px -12px rgba(34, 197, 94, 0.4);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .header {
+      padding: 40px 20px 16px 20px;
+      background: #1F2937;
+      text-align: center;
+    }
+    .headline {
+      font-size: 20px;
+      font-weight: 800;
+      color: #22C55E;
+      margin-bottom: 4px;
+    }
+    .subhead {
+      font-size: 13px;
+      color: #9CA3AF;
+    }
+    .content {
+      padding: 20px;
+      flex: 1;
+    }
+    .debit-card {
+      background: linear-gradient(135deg, #4C1D95 0%, #7C3AED 50%, #2563EB 100%);
+      border-radius: 20px;
+      padding: 20px;
+      height: 180px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 10px 25px rgba(124, 58, 237, 0.5);
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .balance {
+      font-size: 28px;
+      font-weight: 900;
+    }
+    .cashout-btn {
+      background: #22C55E;
+      color: #FFF;
+      text-align: center;
+      padding: 14px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="device-container">
+    <div class="header">
+      <div class="headline">INSTANT CASHOUT & BANKING</div>
+      <div class="subhead">Powered by Stripe Connect Express</div>
+    </div>
+    <div class="content">
+      <div class="debit-card">
+        <div style="display: flex; justify-content: space-between;">
+          <div class="card-title">PurePulse Partner</div>
+          <div style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700;">SILVER TIER</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.7);">AVAILABLE FOR CASHOUT</div>
+          <div class="balance">$450.00</div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;">
+          <div>MATTY HAGEN</div>
+          <div style="font-weight: 800;">CODE: MATTY193</div>
+        </div>
+      </div>
+
+      <div class="cashout-btn">⚡ Cash Out $450.00 Now</div>
+    </div>
+  </div>
+</body>
+</html>
