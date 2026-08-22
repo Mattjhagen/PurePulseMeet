@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Image, StatusBa
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import * as Haptics from 'expo-haptics';
+import { useFonts } from 'expo-font';
 import { PurePulseTheme } from './src/theme/theme';
 import { JitsiHuddleRoom } from './src/components/community/JitsiHuddleRoom';
 import { ChannelFeed } from './src/components/community/ChannelFeed';
@@ -11,18 +12,32 @@ import { AffiliateOverview } from './src/components/affiliate/AffiliateOverview'
 import { SocialCampaignStudio } from './src/components/affiliate/SocialCampaignStudio';
 import { PrintableAssetsHub } from './src/components/affiliate/PrintableAssetsHub';
 import { AuthModal } from './src/components/auth/AuthModal';
-import { claimMobilePairCode, getCurrentUserProfile } from './src/services/api';
+import { claimMobilePairCode, getCurrentUserProfile, linkCurrentAffiliateByEmail } from './src/services/api';
 import { supabase } from './src/services/auth';
+import { AffiliateLinkingScreen } from './src/components/auth/AffiliateLinkingScreen';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'huddles' | 'community' | 'banking' | 'affiliate' | 'campaigns' | 'printables'>('huddles');
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [affiliateLinked, setAffiliateLinked] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [fontsLoaded, fontError] = useFonts(Ionicons.font);
   const selectTab = (tab: typeof activeTab) => {
     void Haptics.selectionAsync();
     setActiveTab(tab);
+  };
+  const refreshAffiliateLink = async () => {
+    await linkCurrentAffiliateByEmail();
+    try {
+      const profile = await getCurrentUserProfile();
+      setAvatarUrl(profile.avatarUrl);
+      setAffiliateLinked(true);
+    } catch {
+      setAvatarUrl(null);
+      setAffiliateLinked(false);
+    }
   };
 
   useEffect(() => {
@@ -30,17 +45,17 @@ export default function App() {
       const { data: { session } } = await supabase.auth.getSession();
       setIsLoggedIn(Boolean(session));
       if (session) {
-        try {
-          setAvatarUrl((await getCurrentUserProfile()).avatarUrl);
-        } catch {
-          setAvatarUrl(null);
-        }
+        await refreshAffiliateLink();
+      } else {
+        setAffiliateLinked(false);
       }
       setAuthLoading(false);
     };
     syncSession();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(Boolean(session));
+      if (session) void refreshAffiliateLink();
+      else setAffiliateLinked(false);
       setAuthLoading(false);
     });
     return () => listener.subscription.unsubscribe();
@@ -53,6 +68,7 @@ export default function App() {
         const code = data.queryParams.code as string;
         const res = await claimMobilePairCode(code);
         if (res.success) {
+          await refreshAffiliateLink();
           Alert.alert('Account Linked! 🎉', 'Your affiliate account has been successfully linked!');
         } else {
           Alert.alert('Linking Error', res.error || 'Failed to claim pair code.');
@@ -68,7 +84,7 @@ export default function App() {
     return () => subscription.remove();
   }, []);
 
-  if (authLoading) {
+  if (authLoading || (!fontsLoaded && !fontError)) {
     return <View style={[styles.container, styles.centered]}><ActivityIndicator size="large" color={PurePulseTheme.colors.primaryLight} /></View>;
   }
 
@@ -108,17 +124,17 @@ export default function App() {
       </View>
 
       {/* Main Tab View Controller */}
-      {isLoggedIn ? <View style={styles.contentArea}>
+      {isLoggedIn && affiliateLinked ? <View style={styles.contentArea}>
         {activeTab === 'huddles' && <JitsiHuddleRoom />}
         {activeTab === 'community' && <ChannelFeed />}
         {activeTab === 'banking' && <BankDashboard />}
         {activeTab === 'affiliate' && <AffiliateOverview />}
         {activeTab === 'campaigns' && <SocialCampaignStudio />}
         {activeTab === 'printables' && <PrintableAssetsHub />}
-      </View> : <View style={[styles.contentArea, styles.centered]}><Ionicons name="lock-closed" size={40} color={PurePulseTheme.colors.primaryLight} /><Text style={styles.signInTitle}>Affiliate sign-in required</Text><Text style={styles.signInBody}>Sign in with the account connected to your PurePulse affiliate dashboard.</Text><TouchableOpacity style={styles.signInButton} onPress={() => setAuthModalVisible(true)}><Text style={styles.signInButtonText}>Sign In</Text></TouchableOpacity></View>}
+      </View> : isLoggedIn ? <AffiliateLinkingScreen onLinked={refreshAffiliateLink} /> : <View style={[styles.contentArea, styles.centered]}><Ionicons name="lock-closed" size={40} color={PurePulseTheme.colors.primaryLight} /><Text style={styles.signInTitle}>Affiliate sign-in required</Text><Text style={styles.signInBody}>Sign in with the account connected to your PurePulse affiliate dashboard.</Text><TouchableOpacity style={styles.signInButton} onPress={() => setAuthModalVisible(true)}><Text style={styles.signInButtonText}>Sign In</Text></TouchableOpacity></View>}
 
       {/* Bottom Navigation Tab Bar */}
-      {isLoggedIn && <View style={styles.bottomTabBar}>
+      {isLoggedIn && affiliateLinked && <View style={styles.bottomTabBar}>
         <TouchableOpacity
           style={styles.tabItem}
           onPress={() => selectTab('huddles')}
@@ -200,6 +216,7 @@ export default function App() {
         onClose={() => isLoggedIn && setAuthModalVisible(false)}
         onLoginSuccess={() => {
           setIsLoggedIn(true);
+          void refreshAffiliateLink();
           setAuthModalVisible(false);
         }}
       />

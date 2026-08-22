@@ -69,6 +69,12 @@ export async function getCurrentUserProfile(): Promise<UserProfile> {
   throw new Error('No affiliate account is linked to this login');
 }
 
+export async function linkCurrentAffiliateByEmail(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('link_current_affiliate_by_email');
+  if (error) return false;
+  return Boolean(data?.success);
+}
+
 // Fetch Channel Messages from Supabase
 export async function fetchChannelMessages(channelId: string): Promise<ChannelMessage[]> {
   const { data, error } = await supabase
