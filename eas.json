@@ -36,8 +36,7 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "matty@purepulse.one",
-        "ascAppId": "one.purepulse.partner"
+        "appleId": "matty@purepulse.one"
       },
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json"
