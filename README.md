@@ -82,16 +82,9 @@ CREATE TABLE IF NOT EXISTS public.payout_transactions (
   created_at timestamptz DEFAULT now()
 );
 
--- 5. Enable Realtime on Chat & Huddles (Idempotent)
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'channel_messages') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.channel_messages;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'huddle_rooms') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.huddle_rooms;
-  END IF;
-END $$;
+-- 5. Enable Realtime on Chat & Huddles
+ALTER PUBLICATION supabase_realtime ADD TABLE public.channel_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.huddle_rooms;
 ```
 
 ---
