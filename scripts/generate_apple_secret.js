@@ -1,9 +1,17 @@
 /**
- * Generate Apple Client Secret JWT for Supabase Auth
- * Usage: node scripts/generate_apple_secret.js <path-to-p8-file> <team-id> <key-id> <client-id>
+ * Generate Apple Client Secret JWT for Supabase Auth using native Node.js crypto module (no npm dependencies needed)
+ * Usage: node scripts/generate_apple_secret.js <path-to-p8-file> [teamId] [keyId] [clientId]
  */
 const fs = require('fs');
-const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+
+function base64url(str) {
+  return Buffer.from(str)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
 
 const p8Path = process.argv[2];
 const teamId = process.argv[3] || 'WZMXKCK98R';
@@ -17,16 +25,36 @@ if (!p8Path) {
 
 const privateKey = fs.readFileSync(p8Path, 'utf8');
 
-const token = jwt.sign({}, privateKey, {
-  algorithm: 'ES256',
-  expiresIn: '180d', // 6 months (max allowed by Apple)
-  audience: 'https://appleid.apple.com',
-  issuer: teamId,
-  subject: clientId,
-  keyid: keyId
-});
+const header = {
+  alg: 'ES256',
+  kw: 'jwt',
+  kid: keyId,
+  typ: 'JWT'
+};
+
+const now = Math.floor(Date.now() / 1000);
+const exp = now + 15777000; // 6 months (182.6 days)
+
+const payload = {
+  iss: teamId,
+  iat: now,
+  exp: exp,
+  aud: 'https://appleid.apple.com',
+  sub: clientId
+};
+
+const encodedHeader = base64url(JSON.stringify(header));
+const encodedPayload = base64url(JSON.stringify(payload));
+const dataToSign = `${encodedHeader}.${encodedPayload}`;
+
+const signer = crypto.createSign('SHA256');
+signer.update(dataToSign);
+const signature = signer.sign({ key: privateKey, dsaEncoding: 'ieee-p1363' });
+
+const encodedSignature = base64url(signature);
+const jwtToken = `${dataToSign}.${encodedSignature}`;
 
 console.log('\n=================== APPLE CLIENT SECRET JWT ===================\n');
-console.log(token);
+console.log(jwtToken);
 console.log('\n===============================================================\n');
 console.log('Copy the JWT string above into Supabase "Secret Key (for OAuth)" field.\n');
