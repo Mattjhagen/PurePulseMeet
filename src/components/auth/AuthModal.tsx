@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PurePulseTheme } from '../../theme/theme';
 import { signInWithGoogle, signInWithApple } from '../../services/auth';
+import { claimMobilePairCode } from '../../services/api';
 
 interface Props {
   visible: boolean;
@@ -12,6 +13,9 @@ interface Props {
 
 export const AuthModal: React.FC<Props> = ({ visible, onClose, onLoginSuccess }) => {
   const [loadingProvider, setLoadingProvider] = useState<'google' | 'apple' | null>(null);
+  const [pairCodeInput, setPairCodeInput] = useState('');
+  const [claimingPairCode, setClaimingPairCode] = useState(false);
+  const [showPairInput, setShowPairInput] = useState(false);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -34,6 +38,30 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, onLoginSuccess })
     } catch (err: any) {
       setLoadingProvider(null);
       Alert.alert('Apple Sign-In Error', err?.message || 'Failed to complete Apple Sign-In.');
+    }
+  };
+
+  const handleClaimPairCode = async () => {
+    if (!pairCodeInput.trim()) {
+      Alert.alert('Missing Code', 'Please enter your 6-digit pair code (e.g. PX-4892) generated in your web dashboard.');
+      return;
+    }
+
+    try {
+      setClaimingPairCode(true);
+      const res = await claimMobilePairCode(pairCodeInput.trim());
+      setClaimingPairCode(false);
+
+      if (res.success) {
+        Alert.alert('Account Linked! 🎉', 'Your affiliate account has been successfully linked to this app!', [
+          { text: 'Great!', onPress: onLoginSuccess }
+        ]);
+      } else {
+        Alert.alert('Linking Failed', res.error || 'Invalid or expired pair code.');
+      }
+    } catch (err: any) {
+      setClaimingPairCode(false);
+      Alert.alert('Error', err?.message || 'Failed to claim pair code.');
     }
   };
 
@@ -83,6 +111,34 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, onLoginSuccess })
                 </>
               )}
             </TouchableOpacity>
+
+            {/* Pair Code Option */}
+            {showPairInput ? (
+              <View style={styles.pairCodeContainer}>
+                <Text style={styles.pairCodeLabel}>Enter 6-Digit Web Pair Code (e.g. PX-4892):</Text>
+                <TextInput
+                  style={styles.pairInput}
+                  placeholder="PX-4892"
+                  placeholderTextColor={PurePulseTheme.colors.textMuted}
+                  value={pairCodeInput}
+                  onChangeText={setPairCodeInput}
+                  autoCapitalize="characters"
+                  maxLength={10}
+                />
+                <TouchableOpacity style={styles.pairSubmitBtn} onPress={handleClaimPairCode} disabled={claimingPairCode}>
+                  {claimingPairCode ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.pairSubmitText}>Link Account Now</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.pairToggleBtn} onPress={() => setShowPairInput(true)}>
+                <Ionicons name="key-outline" size={16} color={PurePulseTheme.colors.primaryLight} />
+                <Text style={styles.pairToggleText}>Have a 6-digit pair code from web?</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Secure SSL Footer */}
@@ -116,10 +172,6 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: PurePulseTheme.colors.cardBorderActive,
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
   },
   brandRow: {
     alignItems: 'center',
@@ -179,6 +231,55 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '700',
     fontSize: 14,
+  },
+  pairToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 6,
+  },
+  pairToggleText: {
+    color: PurePulseTheme.colors.primaryLight,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  pairCodeContainer: {
+    backgroundColor: PurePulseTheme.colors.cardBgSecondary,
+    padding: 12,
+    borderRadius: PurePulseTheme.radii.md,
+    borderWidth: 1,
+    borderColor: PurePulseTheme.colors.cardBorder,
+  },
+  pairCodeLabel: {
+    color: PurePulseTheme.colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  pairInput: {
+    backgroundColor: PurePulseTheme.colors.cardBg,
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 2,
+    textAlign: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: PurePulseTheme.colors.primaryLight,
+    marginBottom: 10,
+  },
+  pairSubmitBtn: {
+    backgroundColor: PurePulseTheme.colors.primary,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  pairSubmitText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 13,
   },
   footerRow: {
     flexDirection: 'row',

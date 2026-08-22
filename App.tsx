@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Image, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Image, StatusBar, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { PurePulseTheme } from './src/theme/theme';
 import { JitsiHuddleRoom } from './src/components/community/JitsiHuddleRoom';
 import { ChannelFeed } from './src/components/community/ChannelFeed';
@@ -10,11 +11,34 @@ import { SocialCampaignStudio } from './src/components/affiliate/SocialCampaignS
 import { PrintableAssetsHub } from './src/components/affiliate/PrintableAssetsHub';
 import { AuthModal } from './src/components/auth/AuthModal';
 import { initialUserProfile } from './src/services/mockData';
+import { claimMobilePairCode } from './src/services/api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'huddles' | 'community' | 'banking' | 'affiliate' | 'campaigns' | 'printables'>('huddles');
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(true);
+
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      const data = Linking.parse(event.url);
+      if (data.queryParams?.code) {
+        const code = data.queryParams.code as string;
+        const res = await claimMobilePairCode(code);
+        if (res.success) {
+          Alert.alert('Account Linked! 🎉', 'Your affiliate account has been successfully linked!');
+        } else {
+          Alert.alert('Linking Error', res.error || 'Failed to claim pair code.');
+        }
+      }
+    };
+
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    return () => subscription.remove();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>

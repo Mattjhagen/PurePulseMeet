@@ -241,3 +241,23 @@ export async function fetchPayoutTransactions(): Promise<PayoutTransaction[]> {
     destination: tx.destination || 'Direct Deposit',
   }));
 }
+
+// Claim Mobile Pair Code from Web Dashboard
+export async function claimMobilePairCode(code: string): Promise<{ success: boolean; error?: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: 'Please log in with Google or Apple first.' };
+  }
+
+  const { data, error } = await supabase.rpc('claim_mobile_pair_code', {
+    p_code: code.trim(),
+    p_user_id: user.id,
+  });
+
+  if (error || !data || !data.success) {
+    return { success: false, error: data?.error || error?.message || 'Invalid or expired pair code' };
+  }
+
+  return { success: true };
+}
