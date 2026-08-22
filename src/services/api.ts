@@ -1,56 +1,38 @@
 import { supabase } from './auth';
-import { UserProfile, ChannelMessage, HuddleRoomInfo, ForumPost, BankingAccount, PayoutTransaction } from '../types';
+import { UserProfile, ChannelMessage, HuddleRoomInfo, BankingAccount, PayoutTransaction } from '../types';
+
+const DEFAULT_AVATAR = 'https://login.purepulse.one/assets/default-avatar.png';
 
 // Fetch Current User Profile from Supabase or Auth state
 export async function getCurrentUserProfile(): Promise<UserProfile> {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    return {
-      id: 'guest',
-      name: 'PurePulse Partner',
-      email: 'partner@purepulse.one',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      partnerCode: 'MATTY193',
-      tier: 'Silver',
-      tierProgress: 45,
-      referralLink: 'https://login.purepulse.one/ref/MATTY193',
-      joinedDate: new Date().toISOString().split('T')[0],
-    };
+    throw new Error('Authentication required');
   }
 
   // Query Supabase affiliates table
   const { data: affiliate } = await supabase
     .from('affiliates')
     .select('*')
-    .eq('user_id', user.id)
-    .single();
+    .eq('auth_user_id', user.id)
+    .maybeSingle();
 
   if (affiliate) {
     return {
       id: affiliate.id,
       name: affiliate.name || user.email?.split('@')[0] || 'Partner',
       email: affiliate.email || user.email || '',
-      avatarUrl: affiliate.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      partnerCode: affiliate.ref_code || 'MATTY193',
+      avatarUrl: affiliate.avatar_url || DEFAULT_AVATAR,
+      partnerCode: affiliate.referral_code,
       tier: affiliate.tier || 'Silver',
-      tierProgress: affiliate.tier_progress || 50,
-      referralLink: `https://login.purepulse.one/ref/${affiliate.ref_code || 'MATTY193'}`,
-      joinedDate: affiliate.created_at ? new Date(affiliate.created_at).toISOString().split('T')[0] : '2026-01-01',
+      tierProgress: affiliate.tier_progress ?? 0,
+      referralLink: `https://login.purepulse.one/ref/${affiliate.referral_code}`,
+      joinedDate: new Date(affiliate.created_at).toISOString().split('T')[0],
     };
   }
 
-  return {
-    id: user.id,
-    name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Partner',
-    email: user.email || '',
-    avatarUrl: user.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    partnerCode: 'MATTY193',
-    tier: 'Bronze',
-    tierProgress: 20,
-    referralLink: 'https://login.purepulse.one/ref/MATTY193',
-    joinedDate: new Date().toISOString().split('T')[0],
-  };
+  throw new Error('No affiliate account is linked to this login');
 }
 
 // Fetch Channel Messages from Supabase
@@ -69,7 +51,7 @@ export async function fetchChannelMessages(channelId: string): Promise<ChannelMe
     id: msg.id,
     channelId: msg.channel_id,
     senderName: msg.sender_name || 'Partner',
-    senderAvatar: msg.sender_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    senderAvatar: msg.sender_avatar || DEFAULT_AVATAR,
     senderRole: msg.sender_role || 'Affiliate',
     content: msg.content,
     timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -122,7 +104,7 @@ export function subscribeToChannelMessages(channelId: string, onNewMessage: (msg
           id: msg.id,
           channelId: msg.channel_id,
           senderName: msg.sender_name || 'Partner',
-          senderAvatar: msg.sender_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          senderAvatar: msg.sender_avatar || DEFAULT_AVATAR,
           senderRole: msg.sender_role || 'Partner',
           content: msg.content,
           timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -140,39 +122,17 @@ export async function fetchHuddleRooms(): Promise<HuddleRoomInfo[]> {
     .select('*')
     .order('created_at', { ascending: false });
 
-  if (error || !data || data.length === 0) {
-    return [
-      {
-        id: 'huddle-1',
-        title: 'Global Founder Pitch & Sales Huddle',
-        hostName: 'Matty Hagen',
-        hostAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-        participantsCount: 14,
-        isLive: true,
-        jitsiRoomUrl: 'https://meet.jit.si/PurePulseGlobalHuddle',
-        category: 'Founder Office Hours',
-      },
-      {
-        id: 'huddle-2',
-        title: 'High-Converting Objection Handling Workshop',
-        hostName: 'Sarah Jenkins',
-        hostAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
-        participantsCount: 8,
-        isLive: false,
-        jitsiRoomUrl: 'https://meet.jit.si/PurePulseObjectionCoaching',
-        category: 'Deal Coaching',
-      }
-    ];
-  }
+  if (error) throw error;
+  if (!data) return [];
 
   return data.map(room => ({
     id: room.id,
     title: room.title,
     hostName: room.host_name || 'Host',
-    hostAvatar: room.host_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    hostAvatar: room.host_avatar || DEFAULT_AVATAR,
     participantsCount: room.participants_count || 1,
     isLive: room.is_live,
-    jitsiRoomUrl: room.jitsi_room_url || `https://meet.jit.si/PurePulseRoom_${room.id}`,
+    jitsiRoomUrl: room.jitsi_room_url,
     category: room.category || 'Deal Coaching',
   }));
 }
@@ -185,37 +145,26 @@ export async function fetchBankingAccount(): Promise<BankingAccount> {
     const { data: affiliate } = await supabase
       .from('affiliates')
       .select('*')
-      .eq('user_id', user.id)
-      .single();
+      .eq('auth_user_id', user.id)
+      .maybeSingle();
 
     if (affiliate) {
       return {
-        availableBalance: affiliate.available_balance || 450.00,
-        pendingCommissions: affiliate.pending_commissions || 125.00,
-        lifetimeEarnings: affiliate.lifetime_earnings || 2480.00,
-        activeClientsCount: affiliate.active_clients || 12,
-        monthlyRecurring: affiliate.monthly_recurring || 840.00,
-        linkClicksCount: affiliate.link_clicks || 342,
-        stripeConnected: true,
-        stripeAccountId: affiliate.stripe_account_id || 'acct_123456789',
-        cardUnlocked: true,
-        nextTierGoal: 'Earn $160 more MRR to unlock Gold Tier & 30% payout bonus',
+        availableBalance: Number(affiliate.available_balance ?? 0),
+        pendingCommissions: Number(affiliate.pending_commissions ?? 0),
+        lifetimeEarnings: Number(affiliate.lifetime_earnings ?? 0),
+        activeClientsCount: Number(affiliate.active_clients ?? 0),
+        monthlyRecurring: Number(affiliate.monthly_recurring ?? 0),
+        linkClicksCount: Number(affiliate.clicks ?? 0),
+        stripeConnected: Boolean(affiliate.payouts_enabled),
+        stripeAccountId: affiliate.stripe_account_id || undefined,
+        cardUnlocked: Boolean(affiliate.issuing_card_id),
+        nextTierGoal: affiliate.next_tier_goal || 'Keep growing your active referrals to reach the next tier.',
       };
     }
   }
 
-  return {
-    availableBalance: 450.00,
-    pendingCommissions: 125.00,
-    lifetimeEarnings: 2480.00,
-    activeClientsCount: 12,
-    monthlyRecurring: 840.00,
-    linkClicksCount: 342,
-    stripeConnected: true,
-    stripeAccountId: 'acct_123456789',
-    cardUnlocked: true,
-    nextTierGoal: 'Earn $160 more MRR to unlock Gold Tier & 30% payout bonus',
-  };
+  throw new Error(user ? 'Affiliate banking account not found' : 'Authentication required');
 }
 
 // Fetch Payout Transactions from Supabase
@@ -225,13 +174,8 @@ export async function fetchPayoutTransactions(): Promise<PayoutTransaction[]> {
     .select('*')
     .order('created_at', { ascending: false });
 
-  if (error || !data || data.length === 0) {
-    return [
-      { id: 'tx-1', amount: 350.00, status: 'Completed', date: 'Today, 2:15 PM', destination: 'Debit Card •••• 2345' },
-      { id: 'tx-2', amount: 120.00, status: 'Completed', date: 'Aug 18, 2026', destination: 'Direct Deposit •••• 8901' },
-      { id: 'tx-3', amount: 480.00, status: 'Completed', date: 'Aug 10, 2026', destination: 'Debit Card •••• 2345' },
-    ];
-  }
+  if (error) throw error;
+  if (!data) return [];
 
   return data.map(tx => ({
     id: tx.id,
@@ -252,7 +196,6 @@ export async function claimMobilePairCode(code: string): Promise<{ success: bool
 
   const { data, error } = await supabase.rpc('claim_mobile_pair_code', {
     p_code: code.trim(),
-    p_user_id: user.id,
   });
 
   if (error || !data || !data.success) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PurePulseTheme } from '../../theme/theme';
@@ -13,35 +13,22 @@ interface Props {
 export const StripePayoutModal: React.FC<Props> = ({ visible, onClose, availableBalance, onCashoutSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [payoutMethod, setPayoutMethod] = useState<'instant' | 'standard'>('instant');
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, []);
 
   const fee = payoutMethod === 'instant' ? availableBalance * 0.01 : 0;
   const netAmount = Math.max(0, availableBalance - fee);
 
-  const executeCashout = () => {
+  const executeCashout = async () => {
     if (availableBalance <= 0) {
       Alert.alert('No Available Funds', 'You currently have $0.00 available to cash out.');
       return;
     }
 
     setLoading(true);
-    timerRef.current = setTimeout(() => {
-      setLoading(false);
-      onCashoutSuccess(netAmount);
-      Alert.alert(
-        '⚡ Instant Payout Initiated!',
-        `$${netAmount.toFixed(2)} (${payoutMethod === 'instant' ? 'after 1% instant fee' : 'standard deposit'}) has been sent via Stripe Connect Express to your account.`
-      );
-      onClose();
-    }, 1500);
+    setLoading(false);
+    Alert.alert(
+      'Payout setup required',
+      'Cashout is disabled until the server-side Stripe payout endpoint and webhook confirmation are configured. No funds were moved.'
+    );
   };
 
   return (

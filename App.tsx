@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Image, StatusBar, Alert } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Image, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { PurePulseTheme } from './src/theme/theme';
@@ -10,13 +10,36 @@ import { AffiliateOverview } from './src/components/affiliate/AffiliateOverview'
 import { SocialCampaignStudio } from './src/components/affiliate/SocialCampaignStudio';
 import { PrintableAssetsHub } from './src/components/affiliate/PrintableAssetsHub';
 import { AuthModal } from './src/components/auth/AuthModal';
-import { initialUserProfile } from './src/services/mockData';
-import { claimMobilePairCode } from './src/services/api';
+import { claimMobilePairCode, getCurrentUserProfile } from './src/services/api';
+import { supabase } from './src/services/auth';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'huddles' | 'community' | 'banking' | 'affiliate' | 'campaigns' | 'printables'>('huddles');
   const [authModalVisible, setAuthModalVisible] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const syncSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsLoggedIn(Boolean(session));
+      if (session) {
+        try {
+          setAvatarUrl((await getCurrentUserProfile()).avatarUrl);
+        } catch {
+          setAvatarUrl(null);
+        }
+      }
+      setAuthLoading(false);
+    };
+    syncSession();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(Boolean(session));
+      setAuthLoading(false);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const handleDeepLink = async (event: { url: string }) => {
@@ -39,6 +62,10 @@ export default function App() {
     const subscription = Linking.addEventListener('url', handleDeepLink);
     return () => subscription.remove();
   }, []);
+
+  if (authLoading) {
+    return <View style={[styles.container, styles.centered]}><ActivityIndicator size="large" color={PurePulseTheme.colors.primaryLight} /></View>;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -69,24 +96,24 @@ export default function App() {
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => setAuthModalVisible(true)} style={styles.userAvatarWrap}>
-            <Image source={{ uri: initialUserProfile.avatarUrl }} style={styles.userAvatar} />
+            {avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.userAvatar} /> : <Ionicons name="person-circle" size={32} color={PurePulseTheme.colors.textMuted} />}
             <View style={styles.onlineBadge} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Main Tab View Controller */}
-      <View style={styles.contentArea}>
+      {isLoggedIn ? <View style={styles.contentArea}>
         {activeTab === 'huddles' && <JitsiHuddleRoom />}
         {activeTab === 'community' && <ChannelFeed />}
         {activeTab === 'banking' && <BankDashboard />}
         {activeTab === 'affiliate' && <AffiliateOverview />}
         {activeTab === 'campaigns' && <SocialCampaignStudio />}
         {activeTab === 'printables' && <PrintableAssetsHub />}
-      </View>
+      </View> : <View style={[styles.contentArea, styles.centered]}><Ionicons name="lock-closed" size={40} color={PurePulseTheme.colors.primaryLight} /><Text style={styles.signInTitle}>Affiliate sign-in required</Text><Text style={styles.signInBody}>Sign in with the account connected to your PurePulse affiliate dashboard.</Text><TouchableOpacity style={styles.signInButton} onPress={() => setAuthModalVisible(true)}><Text style={styles.signInButtonText}>Sign In</Text></TouchableOpacity></View>}
 
       {/* Bottom Navigation Tab Bar */}
-      <View style={styles.bottomTabBar}>
+      {isLoggedIn && <View style={styles.bottomTabBar}>
         <TouchableOpacity
           style={styles.tabItem}
           onPress={() => setActiveTab('huddles')}
@@ -160,12 +187,12 @@ export default function App() {
           />
           <Text style={[styles.tabLabel, activeTab === 'printables' && styles.tabLabelActive]}>Flyers</Text>
         </TouchableOpacity>
-      </View>
+      </View>}
 
       {/* Auth Modal for 1-Tap Google & Apple OAuth */}
       <AuthModal
-        visible={authModalVisible}
-        onClose={() => setAuthModalVisible(false)}
+        visible={authModalVisible || !isLoggedIn}
+        onClose={() => isLoggedIn && setAuthModalVisible(false)}
         onLoginSuccess={() => {
           setIsLoggedIn(true);
           setAuthModalVisible(false);
@@ -267,6 +294,15 @@ const styles = StyleSheet.create({
   contentArea: {
     flex: 1,
   },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  signInTitle: { color: '#FFF', fontSize: 20, fontWeight: '800', marginTop: 14 },
+  signInBody: { color: PurePulseTheme.colors.textSecondary, textAlign: 'center', marginTop: 8, maxWidth: 320 },
+  signInButton: { backgroundColor: PurePulseTheme.colors.primary, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12, marginTop: 20 },
+  signInButtonText: { color: '#FFF', fontWeight: '700' },
   bottomTabBar: {
     flexDirection: 'row',
     backgroundColor: PurePulseTheme.colors.cardBg,

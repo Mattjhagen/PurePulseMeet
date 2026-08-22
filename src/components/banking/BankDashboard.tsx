@@ -31,23 +31,6 @@ export const BankDashboard: React.FC = () => {
     setLoading(false);
   };
 
-  const handleCashoutSuccess = (cashoutAmount: number) => {
-    if (!account) return;
-    const newTx: PayoutTransaction = {
-      id: `tx-${Math.floor(1000 + Math.random() * 9000)}`,
-      amount: cashoutAmount,
-      status: 'Completed',
-      date: 'Just now',
-      destination: 'Stripe Instant Cashout'
-    };
-    setAccount({
-      ...account,
-      availableBalance: 0.00,
-      lifetimeEarnings: account.lifetimeEarnings + cashoutAmount
-    });
-    setLedger([newTx, ...ledger]);
-  };
-
   if (loading || !profile || !account) {
     return (
       <View style={styles.centerBox}>
@@ -132,7 +115,7 @@ export const BankDashboard: React.FC = () => {
         visible={payoutModalVisible}
         onClose={() => setPayoutModalVisible(false)}
         availableBalance={account.availableBalance}
-        onCashoutSuccess={handleCashoutSuccess}
+        onCashoutSuccess={() => loadBankingData()}
       />
     </ScrollView>
   );

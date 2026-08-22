@@ -1,0 +1,3 @@
+-- This mobile repository mirrors the canonical PurePulseAdmin migration.
+-- Apply 029_purepulse_meet_production_hardening.sql from PurePulseAdmin to the shared database.
+-- The full migration is retained there because it depends on the admin affiliates schema.
