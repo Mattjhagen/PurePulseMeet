@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PurePulse Partner Hub",
-    "slug": "purepulse-meet",
+    "slug": "purepulse-affiliate-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +13,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "one.purepulse.partner"
+      "bundleIdentifier": "one.purepulse.partner",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,6 +30,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-apple-authentication",
       [
         "expo-build-properties",
         {
@@ -34,12 +39,6 @@
           }
         }
       ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "c05c8596-193d-411a-a421-541397598e1b"
-      }
-    },
-    "owner": "purepulse-affiliates"
+    ]
   }
 }
