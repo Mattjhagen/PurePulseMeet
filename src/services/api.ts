@@ -1,7 +1,36 @@
 import { supabase } from './auth';
-import { UserProfile, ChannelMessage, HuddleRoomInfo, BankingAccount, PayoutTransaction } from '../types';
+import {
+  UserProfile,
+  ChannelMessage,
+  HuddleRoomInfo,
+  BankingAccount,
+  PayoutTransaction,
+  IssuingProvisionRequest,
+  IssuingStatus,
+  IssuingTransaction,
+} from '../types';
 
 const DEFAULT_AVATAR = 'https://login.purepulse.one/assets/default-avatar.png';
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://login.purepulse.one').replace(/\/$/, '');
+
+async function authenticatedApi<T>(path: string, init?: RequestInit): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Authentication required');
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init?.headers,
+    },
+  });
+  const body = await response.json().catch(() => null) as (T & { error?: string }) | null;
+  if (!response.ok) throw new Error(body?.error || `Request failed (${response.status})`);
+  if (!body) throw new Error('The server returned an empty response');
+  return body;
+}
 
 // Fetch Current User Profile from Supabase or Auth state
 export async function getCurrentUserProfile(): Promise<UserProfile> {
@@ -183,6 +212,47 @@ export async function fetchPayoutTransactions(): Promise<PayoutTransaction[]> {
     status: tx.status || 'Completed',
     date: new Date(tx.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
     destination: tx.destination || 'Direct Deposit',
+  }));
+}
+
+export async function fetchIssuingStatus(): Promise<IssuingStatus> {
+  const result = await authenticatedApi<{
+    eligible: boolean;
+    provisioning_enabled: boolean;
+    account: IssuingStatus['account'];
+  }>('/api/affiliates/issuing/status');
+
+  return {
+    eligible: result.eligible,
+    provisioningEnabled: result.provisioning_enabled,
+    account: result.account,
+  };
+}
+
+export async function provisionIssuingCard(request: IssuingProvisionRequest): Promise<void> {
+  await authenticatedApi('/api/affiliates/issuing/provision', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+export async function fetchIssuingTransactions(): Promise<IssuingTransaction[]> {
+  const { data, error } = await supabase
+    .from('affiliate_issuing_transactions')
+    .select('id, amount_cents, currency, merchant_name, merchant_category, status, type, created_at')
+    .order('created_at', { ascending: false })
+    .limit(25);
+
+  if (error) throw error;
+  return (data || []).map(tx => ({
+    id: tx.id,
+    amount: Number(tx.amount_cents || 0) / 100,
+    currency: String(tx.currency || 'usd').toUpperCase(),
+    merchantName: tx.merchant_name || 'Card transaction',
+    merchantCategory: tx.merchant_category || undefined,
+    status: tx.status,
+    type: tx.type,
+    date: new Date(tx.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
   }));
 }
 

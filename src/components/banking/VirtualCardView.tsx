@@ -3,14 +3,15 @@ import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { PurePulseTheme } from '../../theme/theme';
-import { UserProfile } from '../../types';
+import { IssuingStatus, UserProfile } from '../../types';
 
 interface Props {
   profile: UserProfile;
-  availableBalance: number;
+  issuing: IssuingStatus;
 }
 
-export const VirtualCardView: React.FC<Props> = ({ profile, availableBalance }) => {
+export const VirtualCardView: React.FC<Props> = ({ profile, issuing }) => {
+  const card = issuing.account;
   const getGradientForTier = (tier: string): readonly [string, string, ...string[]] => {
     switch (tier) {
       case 'PurePulse Black Card':
@@ -39,7 +40,7 @@ export const VirtualCardView: React.FC<Props> = ({ profile, availableBalance }) 
             <Ionicons name="pulse" size={22} color="#FFF" />
             <Text style={styles.cardLogoText}>PurePulse</Text>
             <View style={styles.partnerBadge}>
-              <Text style={styles.partnerBadgeText}>PARTNER CARD</Text>
+              <Text style={styles.partnerBadgeText}>{card ? card.environment.toUpperCase() : 'NOT ISSUED'}</Text>
             </View>
           </View>
           <Ionicons name="wifi-outline" size={20} color="rgba(255,255,255,0.7)" style={{ transform: [{ rotate: '90deg' }] }} />
@@ -52,8 +53,8 @@ export const VirtualCardView: React.FC<Props> = ({ profile, availableBalance }) 
             <View style={styles.chipLineVertical} />
           </View>
           <View style={styles.balanceRight}>
-            <Text style={styles.balanceLabel}>AVAILABLE FOR CASHOUT</Text>
-            <Text style={styles.balanceAmount}>${availableBalance.toFixed(2)}</Text>
+            <Text style={styles.balanceLabel}>CARD ALLOCATION</Text>
+            <Text style={styles.balanceAmount}>${((card?.allocated_balance_cents || 0) / 100).toFixed(2)}</Text>
           </View>
         </View>
 
@@ -64,9 +65,14 @@ export const VirtualCardView: React.FC<Props> = ({ profile, availableBalance }) 
             <Text style={styles.cardHolderName}>{profile.name.toUpperCase()}</Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.partnerCodeLabel}>PARTNER CODE</Text>
-            <Text style={styles.partnerCodeVal}>{profile.partnerCode}</Text>
+            <Text style={styles.partnerCodeLabel}>{card?.card_brand || 'VIRTUAL CARD'}</Text>
+            <Text style={styles.partnerCodeVal}>{card?.card_last4 ? `•••• ${card.card_last4}` : profile.partnerCode}</Text>
           </View>
+        </View>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusDot, { backgroundColor: card?.card_status === 'active' ? PurePulseTheme.colors.success : PurePulseTheme.colors.warning }]} />
+          <Text style={styles.statusText}>{card ? card.card_status.toUpperCase() : 'AWAITING ELIGIBILITY'}</Text>
+          {card && <Text style={styles.limitText}>${(card.monthly_spend_limit_cents / 100).toFixed(0)}/month limit</Text>}
         </View>
       </LinearGradient>
     </View>
@@ -85,7 +91,7 @@ const styles = StyleSheet.create({
   cardContainer: {
     borderRadius: 20,
     padding: 20,
-    height: 200,
+    minHeight: 210,
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
@@ -187,5 +193,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 1,
-  }
+  },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { color: 'rgba(255,255,255,0.82)', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 },
+  limitText: { marginLeft: 'auto', color: 'rgba(255,255,255,0.65)', fontSize: 9, fontWeight: '600' },
 });

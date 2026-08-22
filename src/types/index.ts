@@ -58,6 +58,47 @@ export interface BankingAccount {
   nextTierGoal: string;
 }
 
+export interface IssuingCardAccount {
+  card_status: 'inactive' | 'active' | 'canceled';
+  card_brand: string | null;
+  card_last4: string | null;
+  monthly_spend_limit_cents: number;
+  allocated_balance_cents: number;
+  currency: string;
+  environment: 'test';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IssuingStatus {
+  eligible: boolean;
+  provisioningEnabled: boolean;
+  account: IssuingCardAccount | null;
+}
+
+export interface IssuingProvisionRequest {
+  phone: string;
+  address: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    country: 'US';
+  };
+}
+
+export interface IssuingTransaction {
+  id: string;
+  amount: number;
+  currency: string;
+  merchantName: string;
+  merchantCategory?: string;
+  status: string;
+  type: string;
+  date: string;
+}
+
 export interface PayoutTransaction {
   id: string;
   amount: number;
