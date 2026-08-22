@@ -3,6 +3,7 @@
     "name": "PurePulse Partner Hub",
     "slug": "purepulse-affiliate-app",
     "owner": "purepulse-affiliates",
+    "scheme": "purepulse",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

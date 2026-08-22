@@ -8,6 +8,7 @@ import {
   IssuingProvisionRequest,
   IssuingStatus,
   IssuingTransaction,
+  ConnectSandboxStatus,
 } from '../types';
 
 const DEFAULT_AVATAR = 'https://login.purepulse.one/assets/default-avatar.png';
@@ -254,6 +255,36 @@ export async function fetchIssuingTransactions(): Promise<IssuingTransaction[]> 
     type: tx.type,
     date: new Date(tx.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
   }));
+}
+
+export async function fetchConnectSandboxStatus(): Promise<ConnectSandboxStatus> {
+  const result = await authenticatedApi<{
+    enabled: boolean;
+    status: ConnectSandboxStatus['status'];
+    transfers_enabled: boolean;
+    requirements_due: string[];
+    account: ConnectSandboxStatus['account'];
+    last_synced_at?: string | null;
+    warning?: string;
+  }>('/api/affiliates/connect-sandbox/status');
+
+  return {
+    enabled: result.enabled,
+    status: result.status,
+    transfersEnabled: result.transfers_enabled,
+    requirementsDue: result.requirements_due || [],
+    account: result.account,
+    lastSyncedAt: result.last_synced_at,
+    warning: result.warning,
+  };
+}
+
+export async function createConnectSandboxOnboardingLink(): Promise<{ url: string; expiresAt?: number }> {
+  const result = await authenticatedApi<{ url: string; expires_at?: number }>(
+    '/api/affiliates/connect-sandbox/onboard',
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+  return { url: result.url, expiresAt: result.expires_at };
 }
 
 // Claim Mobile Pair Code from Web Dashboard

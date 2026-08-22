@@ -6,9 +6,11 @@ import { VirtualCardView } from './VirtualCardView';
 import { TierProgression } from './TierProgression';
 import { StripePayoutModal } from './StripePayoutModal';
 import { IssuingProvisionModal } from './IssuingProvisionModal';
-import { PayoutTransaction, BankingAccount, IssuingStatus, IssuingTransaction, UserProfile } from '../../types';
+import { ConnectSandboxPanel } from './ConnectSandboxPanel';
+import { ConnectSandboxStatus, PayoutTransaction, BankingAccount, IssuingStatus, IssuingTransaction, UserProfile } from '../../types';
 import {
   fetchBankingAccount,
+  fetchConnectSandboxStatus,
   fetchIssuingStatus,
   fetchIssuingTransactions,
   fetchPayoutTransactions,
@@ -21,6 +23,7 @@ export const BankDashboard: React.FC = () => {
   const [ledger, setLedger] = useState<PayoutTransaction[]>([]);
   const [issuing, setIssuing] = useState<IssuingStatus | null>(null);
   const [cardTransactions, setCardTransactions] = useState<IssuingTransaction[]>([]);
+  const [connectSandbox, setConnectSandbox] = useState<ConnectSandboxStatus | null>(null);
   const [payoutModalVisible, setPayoutModalVisible] = useState(false);
   const [provisionModalVisible, setProvisionModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -34,18 +37,20 @@ export const BankDashboard: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [user, bankData, txHistory, issuingStatus, issuingTransactions] = await Promise.all([
+      const [user, bankData, txHistory, issuingStatus, issuingTransactions, connectStatus] = await Promise.all([
         getCurrentUserProfile(),
         fetchBankingAccount(),
         fetchPayoutTransactions(),
         fetchIssuingStatus(),
         fetchIssuingTransactions(),
+        fetchConnectSandboxStatus(),
       ]);
       setProfile(user);
       setAccount(bankData);
       setLedger(txHistory);
       setIssuing(issuingStatus);
       setCardTransactions(issuingTransactions);
+      setConnectSandbox(connectStatus);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Unable to load banking data');
     } finally {
@@ -61,7 +66,7 @@ export const BankDashboard: React.FC = () => {
     );
   }
 
-  if (loadError || !profile || !account || !issuing) {
+  if (loadError || !profile || !account || !issuing || !connectSandbox) {
     return <View style={styles.centerBox}><Ionicons name="alert-circle-outline" size={32} color={PurePulseTheme.colors.warning} /><Text style={styles.errorText}>{loadError || 'Banking information is unavailable.'}</Text><TouchableOpacity style={styles.retryButton} onPress={loadBankingData}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View>;
   }
 
@@ -108,6 +113,8 @@ export const BankDashboard: React.FC = () => {
         )}
         <Text style={styles.walletNotice}>Apple Pay and Google Wallet provisioning are unavailable in Stripe sandboxes.</Text>
       </View>
+
+      <ConnectSandboxPanel status={connectSandbox} onRefresh={loadBankingData} />
 
       {/* Metric Counters Grid */}
       <View style={styles.metricsGrid}>

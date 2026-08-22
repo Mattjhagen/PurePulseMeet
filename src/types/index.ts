@@ -99,6 +99,23 @@ export interface IssuingTransaction {
   date: string;
 }
 
+export type ConnectSandboxAccountStatus =
+  | 'not_started'
+  | 'onboarding_required'
+  | 'verification_pending'
+  | 'ready'
+  | 'restricted';
+
+export interface ConnectSandboxStatus {
+  enabled: boolean;
+  status: ConnectSandboxAccountStatus;
+  transfersEnabled: boolean;
+  requirementsDue: string[];
+  account: { id: string; dashboard: string } | null;
+  lastSyncedAt?: string | null;
+  warning?: string;
+}
+
 export interface PayoutTransaction {
   id: string;
   amount: number;
