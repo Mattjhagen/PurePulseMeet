@@ -31,6 +31,22 @@ export interface HuddleRoomInfo {
   isLive: boolean;
   jitsiRoomUrl: string;
   category: 'Deal Coaching' | 'Affiliate Success' | 'Impromptu Q&A' | 'Founder Office Hours';
+  hostId?: string;
+}
+
+export interface AffiliateDirectoryEntry {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  tier: string;
+}
+
+export interface DirectMessage {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  createdAt: string;
 }
 
 export interface ForumPost {
@@ -42,6 +58,15 @@ export interface ForumPost {
   content: string;
   repliesCount: number;
   likesCount: number;
+  timestamp: string;
+}
+
+export interface ForumComment {
+  id: string;
+  postId: string;
+  authorName: string;
+  authorAvatar: string;
+  content: string;
   timestamp: string;
 }
 

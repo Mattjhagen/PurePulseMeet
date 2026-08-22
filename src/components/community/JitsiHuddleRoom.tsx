@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Image, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { PurePulseTheme } from '../../theme/theme';
 import { HuddleRoomInfo } from '../../types';
-import { fetchHuddleRooms, getCurrentUserProfile } from '../../services/api';
+import { createHuddleRoom, fetchHuddleRooms, getCurrentUserProfile, subscribeToHuddleRooms } from '../../services/api';
 
 export const JitsiHuddleRoom: React.FC = () => {
   const [huddles, setHuddles] = useState<HuddleRoomInfo[]>([]);
   const [activeRoom, setActiveRoom] = useState<HuddleRoomInfo | null>(null);
-  const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isCamOff, setIsCamOff] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [canCreate, setCanCreate] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [title, setTitle] = useState('');
 
   useEffect(() => {
-    loadHuddles();
+    void loadHuddles();
+    getCurrentUserProfile().then((profile) => setCanCreate(profile.email.toLowerCase().endsWith('@purepulse.one'))).catch(() => setCanCreate(false));
+    const subscription = subscribeToHuddleRooms(() => { void loadHuddles(); });
+    return () => { void subscription.unsubscribe(); };
   }, []);
 
   const loadHuddles = async () => {
@@ -25,20 +29,15 @@ export const JitsiHuddleRoom: React.FC = () => {
   };
 
   const startNewHuddle = async () => {
-    const profile = await getCurrentUserProfile();
-    const roomId = `PurePulseHuddle-${Date.now().toString().slice(-4)}`;
-    const newRoom: HuddleRoomInfo = {
-      id: `huddle-${Date.now()}`,
-      title: 'Impromptu Coaching & Deal Huddle',
-      hostName: `${profile.name} (You)`,
-      hostAvatar: profile.avatarUrl,
-      participantsCount: 1,
-      isLive: true,
-      jitsiRoomUrl: `https://meet.jit.si/${roomId}`,
-      category: 'Impromptu Q&A'
-    };
-    setHuddles([newRoom, ...huddles]);
-    setActiveRoom(newRoom);
+    if (!title.trim()) return;
+    try {
+      const room = await createHuddleRoom(title, 'Impromptu Q&A');
+      setCreateOpen(false);
+      setTitle('');
+      setActiveRoom(room);
+    } catch (error) {
+      Alert.alert('Could not create huddle', error instanceof Error ? error.message : 'Please try again.');
+    }
   };
 
   return (
@@ -55,11 +54,12 @@ export const JitsiHuddleRoom: React.FC = () => {
             Huddle up with fellow affiliates, share live sales wins, and get 1-on-1 deal support.
           </Text>
         </View>
-        <TouchableOpacity style={styles.startHuddleBtn} onPress={startNewHuddle}>
+        <TouchableOpacity style={[styles.startHuddleBtn, !canCreate && styles.joinBtnDisabled]} onPress={() => setCreateOpen(true)} disabled={!canCreate}>
           <Ionicons name="videocam-outline" size={18} color="#FFF" />
           <Text style={styles.startHuddleText}>Start Huddle</Text>
         </TouchableOpacity>
       </View>
+      {!canCreate && <Text style={styles.createNotice}>Joining is open to affiliates. Creating a huddle requires a verified @purepulse.one email.</Text>}
 
       {loading ? (
         <View style={styles.centerBox}>
@@ -67,7 +67,8 @@ export const JitsiHuddleRoom: React.FC = () => {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollList} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionHeader}>Active & Upcoming Rooms</Text>
+          <Text style={styles.sectionHeader}>Live huddles</Text>
+          {huddles.length === 0 && <View style={styles.centerBox}><Ionicons name="videocam-outline" size={42} color={PurePulseTheme.colors.textMuted} /><Text style={styles.createNotice}>No live huddles right now.</Text></View>}
           {huddles.map((room) => (
             <View key={room.id} style={[styles.roomCard, room.isLive && styles.roomCardLive]}>
               <View style={styles.roomHeader}>
@@ -101,10 +102,11 @@ export const JitsiHuddleRoom: React.FC = () => {
               <TouchableOpacity
                 style={[styles.joinBtn, !room.isLive && styles.joinBtnDisabled]}
                 onPress={() => setActiveRoom(room)}
+                disabled={!room.isLive}
               >
                 <Ionicons name="enter-outline" size={18} color="#FFF" />
                 <Text style={styles.joinBtnText}>
-                  {room.isLive ? 'Join Jitsi Meeting' : 'Open Room'}
+                  {room.isLive ? 'Join meeting' : 'Huddle ended'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -144,32 +146,7 @@ export const JitsiHuddleRoom: React.FC = () => {
               />
             </View>
 
-            {/* Floating Huddle Control Bar */}
             <View style={styles.controlBar}>
-              <TouchableOpacity
-                style={[styles.controlBtn, isMicMuted && styles.controlBtnMuted]}
-                onPress={() => setIsMicMuted(!isMicMuted)}
-              >
-                <Ionicons name={isMicMuted ? 'mic-off' : 'mic'} size={20} color="#FFF" />
-                <Text style={styles.controlLabel}>{isMicMuted ? 'Unmute' : 'Mute'}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.controlBtn, isCamOff && styles.controlBtnMuted]}
-                onPress={() => setIsCamOff(!isCamOff)}
-              >
-                <Ionicons name={isCamOff ? 'videocam-off' : 'videocam'} size={20} color="#FFF" />
-                <Text style={styles.controlLabel}>{isCamOff ? 'Start Cam' : 'Cam On'}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.controlBtn}
-                onPress={() => Alert.alert('Hand Raised', 'Your hand has been raised for coaching questions!')}
-              >
-                <Ionicons name="hand-left-outline" size={20} color="#FFF" />
-                <Text style={styles.controlLabel}>Raise Hand</Text>
-              </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.controlBtn, styles.leaveBtn]}
                 onPress={() => setActiveRoom(null)}
@@ -181,6 +158,9 @@ export const JitsiHuddleRoom: React.FC = () => {
           </View>
         </Modal>
       )}
+      <Modal transparent animationType="fade" visible={createOpen} onRequestClose={() => setCreateOpen(false)}>
+        <View style={styles.createBackdrop}><View style={styles.createCard}><Text style={styles.modalTitle}>Create a live huddle</Text><Text style={styles.createNotice}>The meeting is saved to PurePulse and opens with real Jitsi controls.</Text><TextInput style={styles.createInput} value={title} onChangeText={setTitle} placeholder="Huddle title" placeholderTextColor={PurePulseTheme.colors.textMuted} maxLength={120} /><View style={styles.createActions}><TouchableOpacity onPress={() => setCreateOpen(false)}><Text style={styles.createNotice}>Cancel</Text></TouchableOpacity><TouchableOpacity style={styles.startHuddleBtn} onPress={startNewHuddle}><Ionicons name="videocam-outline" size={18} color="#fff" /><Text style={styles.startHuddleText}>Create</Text></TouchableOpacity></View></View></View>
+      </Modal>
     </View>
   );
 };
@@ -195,6 +175,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  createNotice: { color: PurePulseTheme.colors.textMuted, fontSize: 12, textAlign: 'center', marginHorizontal: 20, marginBottom: 8 },
+  createBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  createCard: { width: '100%', maxWidth: 460, borderRadius: 16, padding: 18, gap: 14, backgroundColor: PurePulseTheme.colors.cardBg, borderWidth: 1, borderColor: PurePulseTheme.colors.cardBorder },
+  createInput: { color: PurePulseTheme.colors.textPrimary, borderWidth: 1, borderColor: PurePulseTheme.colors.cardBorder, borderRadius: 10, padding: 12 },
+  createActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 18 },
   bannerContainer: {
     backgroundColor: PurePulseTheme.colors.cardBg,
     margin: 16,

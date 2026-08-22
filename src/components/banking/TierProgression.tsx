@@ -10,20 +10,12 @@ interface Props {
 }
 
 export const TierProgression: React.FC<Props> = ({ profile, account }) => {
-  const tiers = [
-    { name: 'Bronze', referralsRequired: 0, perk: '20% Recurring Commission', color: '#CD7F32' },
-    { name: 'Silver', referralsRequired: 3, perk: '25% Recurring + Instant Stripe Payouts', color: '#C0C0C0' },
-    { name: 'Gold', referralsRequired: 5, perk: '30% Recurring + Physical Black Debit Card', color: '#FFD700' },
-    { name: 'Platinum', referralsRequired: 10, perk: '35% Recurring + Direct Founder Coaching', color: '#E5E4E2' },
-    { name: 'PurePulse Black', referralsRequired: 25, perk: '40% Lifetime MRR + VIP Retreat Access', color: '#A855F7' },
-  ];
-
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="trophy-outline" size={18} color={PurePulseTheme.colors.warning} />
-          <Text style={styles.title}>Tier Advancement & Perks</Text>
+          <Text style={styles.title}>Affiliate progress</Text>
         </View>
         <View style={styles.currentTierBadge}>
           <Text style={styles.currentTierText}>{profile.tier.toUpperCase()}</Text>
@@ -42,35 +34,7 @@ export const TierProgression: React.FC<Props> = ({ profile, account }) => {
         <Text style={styles.nextGoalSub}>{account.nextTierGoal}</Text>
       </View>
 
-      {/* Tier Breakdown List */}
-      <View style={styles.tierList}>
-        {tiers.map((t, idx) => {
-          const isCurrent = profile.tier.toLowerCase().includes(t.name.toLowerCase());
-          const isPassed = account.activeClientsCount >= t.referralsRequired;
-
-          return (
-            <View key={idx} style={[styles.tierRow, isCurrent && styles.tierRowCurrent]}>
-              <View style={[styles.tierDot, { backgroundColor: t.color }]} />
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={[styles.tierName, isCurrent && { color: '#FFF', fontWeight: '700' }]}>{t.name} Partner</Text>
-                  {isCurrent && (
-                    <View style={styles.activeTag}>
-                      <Text style={styles.activeTagText}>CURRENT</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.tierPerk}>{t.perk}</Text>
-              </View>
-
-              <View style={styles.reqBadge}>
-                <Text style={styles.reqText}>{t.referralsRequired} Client{t.referralsRequired === 1 ? '' : 's'}</Text>
-                {isPassed && <Ionicons name="checkmark-circle" size={16} color={PurePulseTheme.colors.success} style={{ marginLeft: 4 }} />}
-              </View>
-            </View>
-          );
-        })}
-      </View>
+      <Text style={styles.disclaimer}>Tier names, requirements, and rewards are shown only when configured in PurePulseAdmin. No unapproved commission or card rewards are displayed.</Text>
     </View>
   );
 };
@@ -143,6 +107,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
   },
+  disclaimer: { color: PurePulseTheme.colors.textMuted, fontSize: 10, lineHeight: 15 },
   tierList: {
     gap: 8,
   },

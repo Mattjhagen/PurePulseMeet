@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Image, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
+import * as Haptics from 'expo-haptics';
 import { PurePulseTheme } from './src/theme/theme';
 import { JitsiHuddleRoom } from './src/components/community/JitsiHuddleRoom';
 import { ChannelFeed } from './src/components/community/ChannelFeed';
@@ -19,6 +20,10 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const selectTab = (tab: typeof activeTab) => {
+    void Haptics.selectionAsync();
+    setActiveTab(tab);
+  };
 
   useEffect(() => {
     const syncSession = async () => {
@@ -75,7 +80,7 @@ export default function App() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.logoIconBg}>
-            <Ionicons name="pulse" size={20} color="#FFF" />
+            <Image source={require('./assets/icon.png')} style={styles.headerLogo} />
           </View>
           <View>
             <Text style={styles.brandTitle}>PurePulse</Text>
@@ -89,7 +94,7 @@ export default function App() {
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={styles.communityHeaderBtn}
-            onPress={() => setActiveTab('huddles')}
+            onPress={() => selectTab('huddles')}
           >
             <View style={styles.livePulseDot} />
             <Text style={styles.communityHeaderBtnText}>Join Huddles</Text>
@@ -116,7 +121,7 @@ export default function App() {
       {isLoggedIn && <View style={styles.bottomTabBar}>
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => setActiveTab('huddles')}
+          onPress={() => selectTab('huddles')}
         >
           <Ionicons
             name={activeTab === 'huddles' ? 'videocam' : 'videocam-outline'}
@@ -128,7 +133,7 @@ export default function App() {
 
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => setActiveTab('community')}
+          onPress={() => selectTab('community')}
         >
           <Ionicons
             name={activeTab === 'community' ? 'chatbubbles' : 'chatbubbles-outline'}
@@ -140,7 +145,7 @@ export default function App() {
 
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => setActiveTab('banking')}
+          onPress={() => selectTab('banking')}
         >
           <Ionicons
             name={activeTab === 'banking' ? 'card' : 'card-outline'}
@@ -154,7 +159,7 @@ export default function App() {
 
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => setActiveTab('affiliate')}
+          onPress={() => selectTab('affiliate')}
         >
           <Ionicons
             name={activeTab === 'affiliate' ? 'stats-chart' : 'stats-chart-outline'}
@@ -166,7 +171,7 @@ export default function App() {
 
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => setActiveTab('campaigns')}
+          onPress={() => selectTab('campaigns')}
         >
           <Ionicons
             name={activeTab === 'campaigns' ? 'share-social' : 'share-social-outline'}
@@ -178,7 +183,7 @@ export default function App() {
 
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => setActiveTab('printables')}
+          onPress={() => selectTab('printables')}
         >
           <Ionicons
             name={activeTab === 'printables' ? 'print' : 'print-outline'}
@@ -226,10 +231,11 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: PurePulseTheme.colors.primary,
+    backgroundColor: PurePulseTheme.colors.cardBgSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerLogo: { width: 34, height: 34, borderRadius: 10 },
   brandTitle: {
     color: '#FFF',
     fontWeight: '800',
@@ -314,6 +320,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minWidth: 0,
+    gap: 2,
   },
   tabLabel: {
     color: PurePulseTheme.colors.textMuted,

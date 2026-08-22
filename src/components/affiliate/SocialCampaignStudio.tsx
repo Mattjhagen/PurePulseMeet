@@ -1,310 +1,37 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, Image, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as WebBrowser from 'expo-web-browser';
 import { PurePulseTheme } from '../../theme/theme';
-import { sampleSocialAssets } from '../../services/mockData';
-import { SocialAsset } from '../../types';
+import { getCurrentUserProfile } from '../../services/api';
+
+const formats = [
+  { id: 'square', label: 'Square', dimensions: '1:1', icon: 'square-outline' as const },
+  { id: 'story', label: 'Story', dimensions: '9:16', icon: 'phone-portrait-outline' as const },
+  { id: 'banner', label: 'Banner', dimensions: '16:9', icon: 'image-outline' as const },
+];
+const headlines = ['Professional Websites Built for $150 Deposit.', 'Is Your Business Website Losing Mobile Customers?', 'Agency-Quality Websites Without the $5,000 Upfront Price.', 'Stop Worrying About Site Updates. Maintenance Included.'];
 
 export const SocialCampaignStudio: React.FC = () => {
-  const [selectedAsset, setSelectedAsset] = useState<SocialAsset>(sampleSocialAssets[0]);
-  const [customHeadline, setCustomHeadline] = useState(sampleSocialAssets[0].defaultHook);
-  const [copiedCopy, setCopiedCopy] = useState(false);
+  const [format, setFormat] = useState('square');
+  const [headline, setHeadline] = useState(headlines[0]);
+  const [code, setCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { getCurrentUserProfile().then((profile) => setCode(profile.partnerCode)).catch((error) => Alert.alert('Studio unavailable', error.message)); }, []);
+  const referralLink = code ? `https://login.purepulse.one/ref/${code}` : '';
+  const graphicUrl = useMemo(() => code ? `https://login.purepulse.one/api/affiliates/assets/social?format=${format}&code=${encodeURIComponent(code)}&headline=${encodeURIComponent(headline)}` : '', [code, format, headline]);
+  const copy = `Upgrade your business website with PurePulse. Agency-grade design starts with a $150 deposit and includes ongoing maintenance.\n\nLearn more: ${referralLink}${code ? `\nPartner code: ${code}` : ''}`;
+  const copyText = async () => { await Clipboard.setStringAsync(copy); setCopied(true); setTimeout(() => setCopied(false), 1800); };
+  const share = async () => { if (graphicUrl) await Share.share({ title: 'PurePulse campaign', message: `${copy}\n\nCampaign graphic: ${graphicUrl}`, url: graphicUrl }); };
 
-  const headlineHooks = [
-    'Professional Websites Built for $150 Deposit.',
-    'Is Your Business Website Losing Mobile Customers?',
-    'Agency-Quality Websites Without the $5,000 Upfront Price.',
-    'Stop Worrying About Site Updates. Maintenance Included.',
-  ];
-
-  const prewrittenCopy = `🚀 Upgrade your business website with zero stress!
-PurePulse builds high-performance, agency-grade websites for just a $150 deposit with ongoing maintenance included.
-
-Use my partner link to check out live examples:
-https://login.purepulse.one/ref/MATTY193 (Code: MATTY193)`;
-
-  const copyScript = async () => {
-    await Clipboard.setStringAsync(prewrittenCopy);
-    setCopiedCopy(true);
-    setTimeout(() => setCopiedCopy(false), 2000);
-  };
-
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentList} showsVerticalScrollIndicator={false}>
-      <Text style={styles.headerTitle}>Social Campaign Studio</Text>
-      <Text style={styles.headerSub}>Generate customized graphics, copy pre-written high-converting posts, and track clicks.</Text>
-
-      {/* Dimensions Selector */}
-      <Text style={styles.sectionLabel}>1. SELECT GRAPHIC DIMENSIONS</Text>
-      <View style={styles.dimensionRow}>
-        {sampleSocialAssets.map((asset) => (
-          <TouchableOpacity
-            key={asset.id}
-            style={[styles.dimensionBtn, selectedAsset.id === asset.id && styles.dimensionBtnActive]}
-            onPress={() => {
-              setSelectedAsset(asset);
-              setCustomHeadline(asset.defaultHook);
-            }}
-          >
-            <Text style={[styles.dimensionText, selectedAsset.id === asset.id && styles.dimensionTextActive]}>
-              {asset.dimensions}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Graphic Preview Card */}
-      <View style={styles.previewCard}>
-        <View style={styles.previewHeader}>
-          <View style={styles.brandLogoRow}>
-            <Ionicons name="pulse" size={16} color={PurePulseTheme.colors.primaryLight} />
-            <Text style={styles.brandText}>PurePulse</Text>
-          </View>
-          <Text style={styles.subText}>WEB DESIGN & MAINTENANCE</Text>
-        </View>
-
-        <View style={styles.badgeRow}>
-          <View style={styles.glowBadge}>
-            <Text style={styles.glowBadgeText}>✨ HIGH PERFORMANCE WEBSITES</Text>
-          </View>
-        </View>
-
-        <Text style={styles.previewHeadline}>{customHeadline}</Text>
-
-        <View style={styles.featureList}>
-          <Text style={styles.featureItem}>✓ Custom design & clean code built to convert</Text>
-          <Text style={styles.featureItem}>✓ Fully responsive & ultra-fast loading</Text>
-          <Text style={styles.featureItem}>✓ $150 deposit to start — all plans include maintenance</Text>
-        </View>
-
-        <View style={styles.previewFooter}>
-          <View>
-            <Text style={styles.footerLabel}>Get Started at purepulse.one</Text>
-            <Text style={styles.footerLink}>Partner Link: login.purepulse.one/ref/MATTY193</Text>
-          </View>
-          <View style={styles.codePill}>
-            <Text style={styles.codePillText}>CODE: MATTY193</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Headline Hook Selector */}
-      <Text style={styles.sectionLabel}>2. CHOOSE HEADLINE HOOK</Text>
-      <View style={styles.hookList}>
-        {headlineHooks.map((hook, idx) => (
-          <TouchableOpacity
-            key={idx}
-            style={[styles.hookChip, customHeadline === hook && styles.hookChipActive]}
-            onPress={() => setCustomHeadline(hook)}
-          >
-            <Text style={[styles.hookText, customHeadline === hook && styles.hookTextActive]}>{hook}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Pre-written Copy Box */}
-      <Text style={styles.sectionLabel}>3. READY-TO-POST COPY (1-CLICK COPY)</Text>
-      <View style={styles.copyBox}>
-        <Text style={styles.copyBody}>{prewrittenCopy}</Text>
-        <TouchableOpacity style={[styles.copyBtn, copiedCopy && styles.copyBtnActive]} onPress={copyScript}>
-          <Ionicons name={copiedCopy ? 'checkmark' : 'copy-outline'} size={16} color="#FFF" />
-          <Text style={styles.copyBtnText}>{copiedCopy ? 'Copied to Clipboard!' : 'Copy Script'}</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
-  );
+  return <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <View style={styles.titleRow}><Image source={require('../../../assets/icon.png')} style={styles.logo} /><View style={styles.titleText}><Text style={styles.title}>Social Campaign Studio</Text><Text style={styles.subtitle}>Personalized, server-generated graphics using your affiliate code.</Text></View></View>
+    <Text style={styles.label}>FORMAT</Text><View style={styles.formats}>{formats.map((item) => <TouchableOpacity key={item.id} style={[styles.format, format === item.id && styles.active]} onPress={() => setFormat(item.id)}><Ionicons name={item.icon} size={19} color={format === item.id ? '#fff' : PurePulseTheme.colors.textSecondary} /><Text numberOfLines={1} style={[styles.formatText, format === item.id && styles.white]}>{item.label} {item.dimensions}</Text></TouchableOpacity>)}</View>
+    <View style={styles.preview}><View style={styles.brand}><Image source={require('../../../assets/icon.png')} style={styles.previewLogo} /><Text style={styles.brandName}>PurePulse</Text></View><Text style={styles.headline}>{headline}</Text><Text style={styles.feature}>Custom design · mobile-ready · maintenance included</Text><View style={styles.footer}><View style={styles.footerText}><Text style={styles.link} numberOfLines={2}>{referralLink || 'Loading your referral link…'}</Text></View>{code ? <View style={styles.code}><Text style={styles.codeText} numberOfLines={1}>CODE: {code}</Text></View> : null}</View></View>
+    <Text style={styles.label}>HEADLINE</Text><View style={styles.hooks}>{headlines.map((item) => <TouchableOpacity key={item} style={[styles.hook, headline === item && styles.active]} onPress={() => setHeadline(item)}><Text style={styles.hookText}>{item}</Text></TouchableOpacity>)}</View>
+    <View style={styles.copyCard}><Text style={styles.copy}>{copy}</Text><View style={styles.actions}><TouchableOpacity style={styles.button} onPress={copyText}><Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={17} color="#fff" /><Text style={styles.white}>{copied ? 'Copied' : 'Copy text'}</Text></TouchableOpacity><TouchableOpacity style={styles.button} onPress={share} disabled={!code}><Ionicons name="share-social-outline" size={17} color="#fff" /><Text style={styles.white}>Share</Text></TouchableOpacity><TouchableOpacity style={styles.secondary} onPress={() => graphicUrl && WebBrowser.openBrowserAsync(graphicUrl)} disabled={!code}><Ionicons name="open-outline" size={17} color={PurePulseTheme.colors.primaryLight} /><Text style={styles.secondaryText}>Open graphic</Text></TouchableOpacity></View></View>
+  </ScrollView>;
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: PurePulseTheme.colors.background,
-  },
-  contentList: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  headerTitle: {
-    ...PurePulseTheme.typography.h2,
-    fontSize: 20,
-  },
-  headerSub: {
-    ...PurePulseTheme.typography.caption,
-    marginTop: 2,
-    marginBottom: 16,
-  },
-  sectionLabel: {
-    color: PurePulseTheme.colors.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  dimensionRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  dimensionBtn: {
-    flex: 1,
-    backgroundColor: PurePulseTheme.colors.cardBg,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: PurePulseTheme.radii.md,
-    borderWidth: 1,
-    borderColor: PurePulseTheme.colors.cardBorder,
-  },
-  dimensionBtnActive: {
-    backgroundColor: 'rgba(124, 58, 237, 0.2)',
-    borderColor: PurePulseTheme.colors.primaryLight,
-  },
-  dimensionText: {
-    color: PurePulseTheme.colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  dimensionTextActive: {
-    color: PurePulseTheme.colors.primaryLight,
-  },
-  previewCard: {
-    backgroundColor: '#0F172A',
-    borderRadius: PurePulseTheme.radii.xl,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.4)',
-    marginVertical: 8,
-  },
-  previewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  brandLogoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  brandText: {
-    color: '#FFF',
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  subText: {
-    color: PurePulseTheme.colors.textMuted,
-    fontSize: 9,
-    fontWeight: '600',
-  },
-  badgeRow: {
-    marginBottom: 10,
-  },
-  glowBadge: {
-    backgroundColor: 'rgba(124, 58, 237, 0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  glowBadgeText: {
-    color: PurePulseTheme.colors.primaryLight,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  previewHeadline: {
-    color: '#FFF',
-    fontSize: 22,
-    fontWeight: '800',
-    lineHeight: 28,
-    marginBottom: 14,
-  },
-  featureList: {
-    gap: 6,
-    marginBottom: 16,
-  },
-  featureItem: {
-    color: PurePulseTheme.colors.textSecondary,
-    fontSize: 12,
-  },
-  previewFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    padding: 12,
-    borderRadius: PurePulseTheme.radii.md,
-  },
-  footerLabel: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 11,
-  },
-  footerLink: {
-    color: PurePulseTheme.colors.textMuted,
-    fontSize: 10,
-  },
-  codePill: {
-    backgroundColor: PurePulseTheme.colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  codePillText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  hookList: {
-    gap: 8,
-  },
-  hookChip: {
-    backgroundColor: PurePulseTheme.colors.cardBg,
-    padding: 12,
-    borderRadius: PurePulseTheme.radii.md,
-    borderWidth: 1,
-    borderColor: PurePulseTheme.colors.cardBorder,
-  },
-  hookChipActive: {
-    borderColor: PurePulseTheme.colors.primaryLight,
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
-  },
-  hookText: {
-    color: PurePulseTheme.colors.textSecondary,
-    fontSize: 12,
-  },
-  hookTextActive: {
-    color: '#FFF',
-    fontWeight: '600',
-  },
-  copyBox: {
-    backgroundColor: PurePulseTheme.colors.cardBg,
-    borderRadius: PurePulseTheme.radii.lg,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: PurePulseTheme.colors.cardBorder,
-  },
-  copyBody: {
-    color: PurePulseTheme.colors.textSecondary,
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  copyBtn: {
-    backgroundColor: PurePulseTheme.colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: PurePulseTheme.radii.md,
-    gap: 6,
-  },
-  copyBtnActive: {
-    backgroundColor: PurePulseTheme.colors.success,
-  },
-  copyBtnText: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 13,
-  }
-});
+const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: PurePulseTheme.colors.background }, content: { padding: 16, paddingBottom: 32 }, titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 }, logo: { width: 38, height: 38, borderRadius: 9 }, titleText: { flex: 1, minWidth: 0 }, title: { ...PurePulseTheme.typography.h2, fontSize: 20 }, subtitle: { ...PurePulseTheme.typography.caption, marginTop: 2, lineHeight: 17 }, label: { color: PurePulseTheme.colors.textMuted, fontSize: 10, fontWeight: '800', marginTop: 18, marginBottom: 8 }, formats: { flexDirection: 'row', gap: 7 }, format: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, paddingVertical: 9, borderWidth: 1, borderColor: PurePulseTheme.colors.cardBorder, borderRadius: 10, backgroundColor: PurePulseTheme.colors.cardBg }, formatText: { flexShrink: 1, color: PurePulseTheme.colors.textSecondary, fontSize: 10, fontWeight: '700' }, active: { borderColor: PurePulseTheme.colors.primaryLight, backgroundColor: 'rgba(124,58,237,0.18)' }, white: { color: '#fff', fontWeight: '800' }, preview: { marginTop: 14, minHeight: 310, borderRadius: 18, padding: 20, justifyContent: 'space-between', backgroundColor: '#0f0b17', borderWidth: 1, borderColor: PurePulseTheme.colors.primary }, brand: { flexDirection: 'row', alignItems: 'center', gap: 8 }, previewLogo: { width: 28, height: 28, borderRadius: 6 }, brandName: { color: '#fff', fontWeight: '900', fontSize: 17 }, headline: { color: '#fff', fontSize: 25, fontWeight: '900', lineHeight: 32 }, feature: { color: PurePulseTheme.colors.textSecondary, fontSize: 12, lineHeight: 18 }, footer: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 11, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.06)' }, footerText: { flex: 1, minWidth: 0 }, link: { color: PurePulseTheme.colors.textSecondary, fontSize: 10, flexShrink: 1 }, code: { maxWidth: '48%', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 7, backgroundColor: PurePulseTheme.colors.primary }, codeText: { color: '#fff', fontSize: 9, fontWeight: '900', flexShrink: 1 }, hooks: { gap: 8 }, hook: { padding: 11, borderRadius: 10, borderWidth: 1, borderColor: PurePulseTheme.colors.cardBorder, backgroundColor: PurePulseTheme.colors.cardBg }, hookText: { color: PurePulseTheme.colors.textSecondary, fontSize: 12 }, copyCard: { marginTop: 16, padding: 14, borderRadius: 14, backgroundColor: PurePulseTheme.colors.cardBg, borderWidth: 1, borderColor: PurePulseTheme.colors.cardBorder }, copy: { color: PurePulseTheme.colors.textSecondary, fontSize: 12, lineHeight: 18 }, actions: { marginTop: 13, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, button: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 9, backgroundColor: PurePulseTheme.colors.primary }, secondary: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 9, borderWidth: 1, borderColor: PurePulseTheme.colors.primary }, secondaryText: { color: PurePulseTheme.colors.primaryLight, fontWeight: '800' } });

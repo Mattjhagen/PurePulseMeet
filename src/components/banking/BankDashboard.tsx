@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { PurePulseTheme } from '../../theme/theme';
 import { VirtualCardView } from './VirtualCardView';
 import { TierProgression } from './TierProgression';
-import { StripePayoutModal } from './StripePayoutModal';
 import { IssuingProvisionModal } from './IssuingProvisionModal';
 import { ConnectSandboxPanel } from './ConnectSandboxPanel';
 import { ConnectSandboxStatus, PayoutTransaction, BankingAccount, IssuingStatus, IssuingTransaction, UserProfile } from '../../types';
@@ -24,7 +23,6 @@ export const BankDashboard: React.FC = () => {
   const [issuing, setIssuing] = useState<IssuingStatus | null>(null);
   const [cardTransactions, setCardTransactions] = useState<IssuingTransaction[]>([]);
   const [connectSandbox, setConnectSandbox] = useState<ConnectSandboxStatus | null>(null);
-  const [payoutModalVisible, setPayoutModalVisible] = useState(false);
   const [provisionModalVisible, setProvisionModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -76,16 +74,12 @@ export const BankDashboard: React.FC = () => {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.headerTitle}>PurePulse Partner Bank</Text>
-          <Text style={styles.headerSub}>DoorDash-style Instant Cashout & Stripe Payouts</Text>
+          <Text style={styles.headerSub}>Verified commissions and Stripe sandbox tools</Text>
         </View>
-        <TouchableOpacity style={styles.cashoutBtn} onPress={() => setPayoutModalVisible(true)}>
-          <Ionicons name="flash" size={16} color="#FFF" />
-          <Text style={styles.cashoutBtnText}>Cash Out</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Interactive Card Component */}
-      <VirtualCardView profile={profile} issuing={issuing} />
+      {issuing.account ? <VirtualCardView profile={profile} issuing={issuing} /> : null}
 
       <View style={styles.issuingPanel}>
         <View style={styles.issuingHeading}>
@@ -119,27 +113,27 @@ export const BankDashboard: React.FC = () => {
       {/* Metric Counters Grid */}
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>ACCRUING MRR</Text>
-          <Text style={styles.metricValue}>${account.monthlyRecurring.toFixed(2)}/mo</Text>
-          <Text style={styles.metricSub}>{account.activeClientsCount} Paying Clients</Text>
+          <Text style={styles.metricLabel}>AVAILABLE COMMISSIONS</Text>
+          <Text style={styles.metricValue}>${account.availableBalance.toFixed(2)}</Text>
+          <Text style={styles.metricSub}>Recorded in PurePulse</Text>
         </View>
 
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>PENDING COMMISSIONS</Text>
           <Text style={styles.metricValue}>${account.pendingCommissions.toFixed(2)}</Text>
-          <Text style={styles.metricSub}>Clears 1st of month</Text>
+          <Text style={styles.metricSub}>Awaiting settlement</Text>
         </View>
 
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>LIFETIME PAID OUT</Text>
           <Text style={styles.metricValue}>${account.lifetimeEarnings.toFixed(2)}</Text>
-          <Text style={styles.metricSub}>Stripe Express</Text>
+          <Text style={styles.metricSub}>Recorded payouts</Text>
         </View>
 
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>LINK CLICKS</Text>
           <Text style={styles.metricValue}>{account.linkClicksCount}</Text>
-          <Text style={styles.metricSub}>3.2% Conversion</Text>
+          <Text style={styles.metricSub}>Tracked referral visits</Text>
         </View>
       </View>
 
@@ -181,13 +175,6 @@ export const BankDashboard: React.FC = () => {
         )}
       </View>
 
-      {/* Stripe Cashout Modal */}
-      <StripePayoutModal
-        visible={payoutModalVisible}
-        onClose={() => setPayoutModalVisible(false)}
-        availableBalance={account.availableBalance}
-        onCashoutSuccess={() => loadBankingData()}
-      />
       <IssuingProvisionModal visible={provisionModalVisible} onClose={() => setProvisionModalVisible(false)} onProvisioned={loadBankingData} />
     </ScrollView>
   );

@@ -15,9 +15,12 @@
     },
     "ios": {
       "supportsTablet": true,
+      "usesAppleSignIn": true,
       "bundleIdentifier": "one.purepulse.partner",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "PurePulse uses the camera when you join a video huddle.",
+        "NSMicrophoneUsageDescription": "PurePulse uses the microphone when you join an audio or video huddle."
       }
     },
     "android": {
@@ -25,12 +28,18 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B0F19"
       },
-      "package": "one.purepulse.partner"
+      "package": "one.purepulse.partner",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-apple-authentication",
+      "expo-secure-store",
       [
         "expo-build-properties",
         {

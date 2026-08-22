@@ -1,512 +1,98 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PurePulseTheme } from '../../theme/theme';
-import { ChannelMessage, ForumPost } from '../../types';
-import { fetchChannelMessages, sendChannelMessage, subscribeToChannelMessages, getCurrentUserProfile } from '../../services/api';
-import { sampleForumPosts } from '../../services/mockData';
+import { AffiliateDirectoryEntry, ChannelMessage, DirectMessage, ForumComment, ForumPost, UserProfile } from '../../types';
+import { createForumComment, createForumPost, fetchAffiliateDirectory, fetchChannelMessages, fetchDirectMessages, fetchForumComments, fetchForumPosts, getCurrentUserProfile, sendChannelMessage, sendDirectMessage, subscribeToChannelMessages, subscribeToDirectMessages } from '../../services/api';
+
+const channelOptions = [
+  ['wins-and-success', 'trophy-outline', 'Wins'], ['general', 'chatbubbles-outline', 'General'],
+  ['coaching-deals', 'briefcase-outline', 'Coaching'], ['announcements', 'megaphone-outline', 'Announcements'],
+] as const;
 
 export const ChannelFeed: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'channels' | 'dms' | 'forum'>('channels');
-  const [activeChannel, setActiveChannel] = useState<string>('wins-and-success');
+  const [tab, setTab] = useState<'channels' | 'dms' | 'forum'>('channels');
+  const [channel, setChannel] = useState('wins-and-success');
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
-  const [inputText, setInputText] = useState('');
+  const [directory, setDirectory] = useState<AffiliateDirectoryEntry[]>([]);
+  const [recipient, setRecipient] = useState<AffiliateDirectoryEntry | null>(null);
+  const [direct, setDirect] = useState<DirectMessage[]>([]);
+  const [posts, setPosts] = useState<ForumPost[]>([]);
+  const [text, setText] = useState('');
+  const [postTitle, setPostTitle] = useState('');
+  const [postBody, setPostBody] = useState('');
+  const [selectedPost, setSelectedPost] = useState<ForumPost | null>(null);
+  const [comments, setComments] = useState<ForumComment[]>([]);
+  const [commentText, setCommentText] = useState('');
   const [loading, setLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState({ name: 'Partner', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150' });
-  const [forumPosts, setForumPosts] = useState<ForumPost[]>(sampleForumPosts);
+  const [sending, setSending] = useState(false);
 
-  const channels = [
-    { id: 'wins-and-success', name: '🎉 wins-and-success' },
-    { id: 'general', name: '💬 general' },
-    { id: 'coaching-deals', name: '💼 coaching-deals' },
-    { id: 'announcements', name: '📢 announcements' },
-  ];
-
+  useEffect(() => { getCurrentUserProfile().then(setProfile).catch(showError); }, []);
   useEffect(() => {
-    loadUserAndMessages();
-  }, [activeChannel]);
-
-  const loadUserAndMessages = async () => {
-    setLoading(true);
-    const profile = await getCurrentUserProfile();
-    setUserProfile({ name: profile.name, avatarUrl: profile.avatarUrl });
-
-    const liveMessages = await fetchChannelMessages(activeChannel);
-    setMessages(liveMessages);
-    setLoading(false);
-
-    // Subscribe to realtime updates for this channel
-    const subscription = subscribeToChannelMessages(activeChannel, (newMsg) => {
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === newMsg.id)) return prev;
-        return [...prev, newMsg];
-      });
+    if (tab !== 'channels') return;
+    setLoading(true); fetchChannelMessages(channel).then(setMessages).catch(showError).finally(() => setLoading(false));
+    const sub = subscribeToChannelMessages(channel, (message) => setMessages((items) => items.some(({ id }) => id === message.id) ? items : [...items, message]));
+    return () => { void sub.unsubscribe(); };
+  }, [tab, channel]);
+  useEffect(() => {
+    if (tab !== 'dms' || !profile) return;
+    setLoading(true); fetchAffiliateDirectory().then((items) => setDirectory(items.filter(({ id }) => id !== profile.id))).catch(showError).finally(() => setLoading(false));
+    const sub = subscribeToDirectMessages((message) => {
+      if (recipient && (message.senderId === recipient.id || message.receiverId === recipient.id)) setDirect((items) => items.some(({ id }) => id === message.id) ? items : [...items, message]);
     });
+    return () => { void sub.unsubscribe(); };
+  }, [tab, profile, recipient]);
+  useEffect(() => {
+    if (!recipient) return;
+    setLoading(true); fetchDirectMessages(recipient.id).then(setDirect).catch(showError).finally(() => setLoading(false));
+  }, [recipient]);
+  useEffect(() => {
+    if (tab !== 'forum') return;
+    setLoading(true); fetchForumPosts().then(setPosts).catch(showError).finally(() => setLoading(false));
+  }, [tab]);
 
-    return () => {
-      subscription.unsubscribe();
-    };
+  const send = async () => {
+    if (!text.trim() || !profile || sending) return;
+    setSending(true);
+    try {
+      if (tab === 'channels') await sendChannelMessage(channel, text, profile.name, profile.avatarUrl);
+      else if (recipient) { await sendDirectMessage(recipient.id, text); setDirect(await fetchDirectMessages(recipient.id)); }
+      setText('');
+    } catch (error) { showError(error); } finally { setSending(false); }
   };
-
-  const handleSend = async () => {
-    if (!inputText.trim()) return;
-
-    const content = inputText.trim();
-    setInputText('');
-
-    // Optimistic UI update
-    const tempId = `temp-${Date.now()}`;
-    const optimisticMsg: ChannelMessage = {
-      id: tempId,
-      channelId: activeChannel,
-      senderName: userProfile.name,
-      senderAvatar: userProfile.avatarUrl,
-      senderRole: 'Partner',
-      content,
-      timestamp: 'Just now',
-      likesCount: 0,
-    };
-
-    setMessages((prev) => [...prev, optimisticMsg]);
-
-    const sent = await sendChannelMessage(activeChannel, content, userProfile.name, userProfile.avatarUrl);
-    if (sent) {
-      setMessages((prev) => prev.map((m) => (m.id === tempId ? sent : m)));
-    }
+  const publish = async () => {
+    if (!postTitle.trim() || !postBody.trim()) return;
+    setSending(true);
+    try { await createForumPost(postTitle, postBody, 'Community'); setPostTitle(''); setPostBody(''); setPosts(await fetchForumPosts()); }
+    catch (error) { showError(error); } finally { setSending(false); }
   };
+  const openComments = async (post: ForumPost) => { setSelectedPost(post); try { setComments(await fetchForumComments(post.id)); } catch (error) { showError(error); } };
+  const comment = async () => { if (!selectedPost || !commentText.trim()) return; setSending(true); try { await createForumComment(selectedPost.id, commentText); setCommentText(''); setComments(await fetchForumComments(selectedPost.id)); setPosts(await fetchForumPosts()); } catch (error) { showError(error); } finally { setSending(false); } };
 
-  const toggleLike = (id: string) => {
-    setMessages((prev) =>
-      prev.map((m) => {
-        if (m.id === id) {
-          const nextLiked = !m.hasLiked;
-          return {
-            ...m,
-            hasLiked: nextLiked,
-            likesCount: Math.max(0, nextLiked ? m.likesCount + 1 : m.likesCount - 1),
-          };
-        }
-        return m;
-      })
-    );
-  };
+  return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={88}>
+    <View style={styles.tabs}>{([['channels', 'chatbubbles-outline', 'Channels'], ['dms', 'paper-plane-outline', 'DMs'], ['forum', 'newspaper-outline', 'Board']] as const).map(([id, icon, label]) =>
+      <TouchableOpacity key={id} style={[styles.tab, tab === id && styles.selected]} onPress={() => setTab(id)}><Ionicons name={icon} size={18} color={tab === id ? '#fff' : PurePulseTheme.colors.textSecondary} /><Text style={[styles.tabLabel, tab === id && styles.white]}>{label}</Text></TouchableOpacity>)}</View>
 
-  return (
-    <View style={styles.container}>
-      {/* Top Segmented Navigation Tabs */}
-      <View style={styles.topTabs}>
-        <TouchableOpacity
-          style={[styles.topTabBtn, activeTab === 'channels' && styles.topTabBtnActive]}
-          onPress={() => setActiveTab('channels')}
-        >
-          <Ionicons name="chatbubbles-outline" size={16} color={activeTab === 'channels' ? '#FFF' : PurePulseTheme.colors.textSecondary} />
-          <Text style={[styles.topTabText, activeTab === 'channels' && styles.topTabTextActive]}>Group Channels</Text>
-        </TouchableOpacity>
+    {tab === 'channels' && <><ScrollView horizontal contentContainerStyle={styles.ribbon} showsHorizontalScrollIndicator={false}>{channelOptions.map(([id, icon, label]) =>
+      <TouchableOpacity key={id} style={[styles.chip, channel === id && styles.outlined]} onPress={() => setChannel(id)}><Ionicons name={icon} size={15} color={PurePulseTheme.colors.primaryLight} /><Text style={styles.muted}>{label}</Text></TouchableOpacity>)}</ScrollView>
+      <Messages loading={loading} items={messages.map((item) => ({ id: item.id, name: item.senderName, avatar: item.senderAvatar, body: item.content, time: item.timestamp, mine: item.senderName === profile?.name }))} />
+      <Composer value={text} setValue={setText} send={send} disabled={sending} placeholder={`Message #${channel}`} /></>}
 
-        <TouchableOpacity
-          style={[styles.topTabBtn, activeTab === 'dms' && styles.topTabBtnActive]}
-          onPress={() => setActiveTab('dms')}
-        >
-          <Ionicons name="paper-plane-outline" size={16} color={activeTab === 'dms' ? '#FFF' : PurePulseTheme.colors.textSecondary} />
-          <Text style={[styles.topTabText, activeTab === 'dms' && styles.topTabTextActive]}>Direct Messages</Text>
-        </TouchableOpacity>
+    {tab === 'dms' && <><ScrollView horizontal contentContainerStyle={styles.ribbon} showsHorizontalScrollIndicator={false}>{directory.map((person) =>
+      <TouchableOpacity key={person.id} style={[styles.chip, recipient?.id === person.id && styles.outlined]} onPress={() => setRecipient(person)}><Image source={{ uri: person.avatarUrl }} style={styles.avatarSmall} /><Text numberOfLines={1} style={styles.muted}>{person.name}</Text></TouchableOpacity>)}</ScrollView>
+      <Text style={styles.heading}>{recipient?.name || 'Direct messages'}</Text>
+      {!recipient ? <Empty text={loading ? 'Loading affiliates…' : 'Choose an affiliate to start a private conversation.'} /> : <><Messages loading={loading} items={direct.map((item) => ({ id: item.id, name: item.senderId === profile?.id ? 'You' : recipient.name, avatar: item.senderId === profile?.id ? profile?.avatarUrl : recipient.avatarUrl, body: item.content, time: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), mine: item.senderId === profile?.id }))} /><Composer value={text} setValue={setText} send={send} disabled={sending} placeholder={`Message ${recipient.name}`} /></>}</>}
 
-        <TouchableOpacity
-          style={[styles.topTabBtn, activeTab === 'forum' && styles.topTabBtnActive]}
-          onPress={() => setActiveTab('forum')}
-        >
-          <Ionicons name="newspaper-outline" size={16} color={activeTab === 'forum' ? '#FFF' : PurePulseTheme.colors.textSecondary} />
-          <Text style={[styles.topTabText, activeTab === 'forum' && styles.topTabTextActive]}>Strategy Forum</Text>
-        </TouchableOpacity>
-      </View>
-
-      {activeTab === 'channels' && (
-        <View style={{ flex: 1 }}>
-          {/* Channel Selector Ribbon */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.channelRibbon}>
-            {channels.map((ch) => (
-              <TouchableOpacity
-                key={ch.id}
-                style={[styles.channelChip, activeChannel === ch.id && styles.channelChipActive]}
-                onPress={() => setActiveChannel(ch.id)}
-              >
-                <Text style={[styles.channelChipText, activeChannel === ch.id && styles.channelChipTextActive]}>
-                  {ch.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Messages Feed */}
-          {loading ? (
-            <View style={styles.centerBox}>
-              <ActivityIndicator size="large" color={PurePulseTheme.colors.primaryLight} />
-            </View>
-          ) : messages.length === 0 ? (
-            <View style={styles.centerBox}>
-              <Ionicons name="chatbubble-ellipses-outline" size={48} color={PurePulseTheme.colors.textMuted} />
-              <Text style={styles.emptyTitle}>No messages yet in #{activeChannel}</Text>
-              <Text style={styles.emptySub}>Be the first partner to start the conversation!</Text>
-            </View>
-          ) : (
-            <ScrollView contentContainerStyle={styles.messagesList} showsVerticalScrollIndicator={false}>
-              {messages.map((msg) => (
-                <View key={msg.id} style={styles.messageBubble}>
-                  <Image source={{ uri: msg.senderAvatar }} style={styles.avatar} />
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.msgHeader}>
-                      <Text style={styles.senderName}>{msg.senderName}</Text>
-                      {msg.senderRole && (
-                        <View style={styles.roleBadge}>
-                          <Text style={styles.roleText}>{msg.senderRole}</Text>
-                        </View>
-                      )}
-                      <Text style={styles.timestamp}>{msg.timestamp}</Text>
-                    </View>
-                    <Text style={styles.msgContent}>{msg.content}</Text>
-
-                    <View style={styles.msgFooter}>
-                      <TouchableOpacity
-                        style={[styles.likeBtn, msg.hasLiked && styles.likeBtnActive]}
-                        onPress={() => toggleLike(msg.id)}
-                      >
-                        <Ionicons name={msg.hasLiked ? 'heart' : 'heart-outline'} size={14} color={msg.hasLiked ? '#EC4899' : PurePulseTheme.colors.textMuted} />
-                        <Text style={[styles.likeCount, msg.hasLiked && { color: '#EC4899' }]}>{msg.likesCount}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-
-          {/* Input Bar */}
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              placeholder={`Message #${activeChannel}...`}
-              placeholderTextColor={PurePulseTheme.colors.textMuted}
-              value={inputText}
-              onChangeText={setInputText}
-              maxLength={500}
-              returnKeyType="send"
-              onSubmitEditing={handleSend}
-            />
-            <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
-              <Ionicons name="send" size={16} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {activeTab === 'dms' && (
-        <View style={styles.dmContainer}>
-          <Text style={styles.sectionTitle}>Coaching & Founder DMs</Text>
-          <TouchableOpacity style={styles.dmCard}>
-            <Image source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' }} style={styles.avatarLarge} />
-            <View style={{ flex: 1 }}>
-              <View style={styles.msgHeader}>
-                <Text style={styles.senderName}>Matty Hagen (Founder)</Text>
-                <Text style={styles.timestamp}>Online</Text>
-              </View>
-              <Text style={styles.msgContent} numberOfLines={1}>Welcome to PurePulse Partner Hub! Direct messaging is active.</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {activeTab === 'forum' && (
-        <ScrollView contentContainerStyle={styles.forumList} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionTitle}>Community Strategy Forum</Text>
-          {forumPosts.map((post) => (
-            <View key={post.id} style={styles.forumCard}>
-              <View style={styles.forumCategoryTag}>
-                <Text style={styles.forumCategoryText}>{post.category}</Text>
-              </View>
-              <Text style={styles.forumPostTitle}>{post.title}</Text>
-              <Text style={styles.forumPostSnippet}>{post.content}</Text>
-              
-              <View style={styles.forumFooter}>
-                <View style={styles.authorRow}>
-                  <Image source={{ uri: post.authorAvatar }} style={styles.avatarSmall} />
-                  <Text style={styles.authorName}>{post.authorName} • {post.timestamp}</Text>
-                </View>
-
-                <View style={styles.forumStats}>
-                  <Ionicons name="chatbox-ellipses-outline" size={14} color={PurePulseTheme.colors.textMuted} />
-                  <Text style={styles.statText}>{post.repliesCount}</Text>
-                </View>
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      )}
-    </View>
-  );
+    {tab === 'forum' && <ScrollView contentContainerStyle={styles.posts}><Text style={styles.heading}>Affiliate message board</Text><View style={styles.card}><TextInput value={postTitle} onChangeText={setPostTitle} placeholder="Post title" placeholderTextColor={PurePulseTheme.colors.textMuted} style={styles.input} maxLength={140} /><TextInput value={postBody} onChangeText={setPostBody} placeholder="Share an announcement or coaching tip" placeholderTextColor={PurePulseTheme.colors.textMuted} style={[styles.input, styles.multiline]} multiline maxLength={4000} /><TouchableOpacity style={styles.publish} onPress={publish} disabled={sending}><Ionicons name="add-circle-outline" size={18} color="#fff" /><Text style={styles.white}>Publish</Text></TouchableOpacity></View>{loading ? <ActivityIndicator color={PurePulseTheme.colors.primaryLight} /> : posts.length === 0 ? <Empty text="No posts yet. Start the conversation." /> : posts.map((post) => <View key={post.id} style={styles.card}><Text style={styles.postTitle}>{post.title}</Text><Text style={styles.body}>{post.content}</Text><View style={styles.author}><Image source={{ uri: post.authorAvatar }} style={styles.avatarSmall} /><Text style={[styles.muted, { flex: 1 }]}>{post.authorName} · {post.timestamp}</Text><TouchableOpacity style={styles.commentButton} onPress={() => openComments(post)}><Ionicons name="chatbox-outline" size={15} color={PurePulseTheme.colors.primaryLight} /><Text style={styles.secondaryText}>{post.repliesCount} Comments</Text></TouchableOpacity></View>{selectedPost?.id === post.id && <View style={styles.comments}>{comments.map((item) => <View key={item.id} style={styles.comment}><Image source={{ uri: item.authorAvatar }} style={styles.avatarSmall} /><View style={{ flex: 1 }}><Text style={styles.name}>{item.authorName} <Text style={styles.muted}>{item.timestamp}</Text></Text><Text style={styles.body}>{item.content}</Text></View></View>)}<View style={styles.commentComposer}><TextInput style={[styles.input, { flex: 1 }]} value={commentText} onChangeText={setCommentText} placeholder="Write a comment" placeholderTextColor={PurePulseTheme.colors.textMuted} maxLength={2000} /><TouchableOpacity style={styles.send} onPress={comment} disabled={sending}><Ionicons name="send" size={16} color="#fff" /></TouchableOpacity></View></View>}</View>)}</ScrollView>}
+  </KeyboardAvoidingView>;
 };
 
+function showError(error: unknown) { Alert.alert('Community unavailable', error instanceof Error ? error.message : 'Please try again.'); }
+const Empty = ({ text }: { text: string }) => <View style={styles.empty}><Ionicons name="chatbubble-ellipses-outline" size={42} color={PurePulseTheme.colors.textMuted} /><Text style={styles.muted}>{text}</Text></View>;
+const Messages = ({ loading, items }: { loading: boolean; items: { id: string; name: string; avatar?: string; body: string; time: string; mine: boolean }[] }) => loading ? <View style={styles.empty}><ActivityIndicator color={PurePulseTheme.colors.primaryLight} /></View> : <ScrollView contentContainerStyle={styles.messages}>{items.length === 0 ? <Empty text="No messages yet." /> : items.map((item) => <View key={item.id} style={[styles.message, item.mine && styles.outlined]}>{item.avatar ? <Image source={{ uri: item.avatar }} style={styles.avatar} /> : null}<View style={styles.messageText}><Text style={styles.name}>{item.name} <Text style={styles.muted}>{item.time}</Text></Text><Text style={styles.body}>{item.body}</Text></View></View>)}</ScrollView>;
+const Composer = ({ value, setValue, send, disabled, placeholder }: { value: string; setValue: (value: string) => void; send: () => void; disabled: boolean; placeholder: string }) => <View style={styles.composer}><TextInput style={styles.composerInput} value={value} onChangeText={setValue} placeholder={placeholder} placeholderTextColor={PurePulseTheme.colors.textMuted} maxLength={4000} /><TouchableOpacity style={styles.send} onPress={send} disabled={disabled}><Ionicons name="send" size={17} color="#fff" /></TouchableOpacity></View>;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: PurePulseTheme.colors.background,
-  },
-  topTabs: {
-    flexDirection: 'row',
-    backgroundColor: PurePulseTheme.colors.cardBg,
-    padding: 6,
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: PurePulseTheme.radii.md,
-    borderWidth: 1,
-    borderColor: PurePulseTheme.colors.cardBorder,
-  },
-  topTabBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: PurePulseTheme.radii.sm,
-    gap: 4,
-  },
-  topTabBtnActive: {
-    backgroundColor: PurePulseTheme.colors.primary,
-  },
-  topTabText: {
-    color: PurePulseTheme.colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  topTabTextActive: {
-    color: '#FFF',
-  },
-  channelRibbon: {
-    maxHeight: 44,
-    paddingHorizontal: 16,
-    marginVertical: 8,
-  },
-  channelChip: {
-    backgroundColor: PurePulseTheme.colors.cardBg,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: PurePulseTheme.colors.cardBorder,
-  },
-  channelChipActive: {
-    borderColor: PurePulseTheme.colors.primaryLight,
-    backgroundColor: 'rgba(124, 58, 237, 0.2)',
-  },
-  channelChipText: {
-    color: PurePulseTheme.colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  channelChipTextActive: {
-    color: PurePulseTheme.colors.primaryLight,
-  },
-  messagesList: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  centerBox: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyTitle: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 15,
-    marginTop: 12,
-  },
-  emptySub: {
-    color: PurePulseTheme.colors.textMuted,
-    fontSize: 12,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  messageBubble: {
-    flexDirection: 'row',
-    backgroundColor: PurePulseTheme.colors.cardBg,
-    borderRadius: PurePulseTheme.radii.md,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: PurePulseTheme.colors.cardBorder,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 10,
-  },
-  avatarLarge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 12,
-  },
-  avatarSmall: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    marginRight: 6,
-  },
-  msgHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 6,
-  },
-  senderName: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  roleBadge: {
-    backgroundColor: 'rgba(124, 58, 237, 0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  roleText: {
-    color: PurePulseTheme.colors.primaryLight,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  timestamp: {
-    color: PurePulseTheme.colors.textMuted,
-    fontSize: 11,
-    marginLeft: 'auto',
-  },
-  msgContent: {
-    color: PurePulseTheme.colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  msgFooter: {
-    marginTop: 8,
-    flexDirection: 'row',
-  },
-  likeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: PurePulseTheme.colors.cardBgSecondary,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  likeBtnActive: {
-    backgroundColor: 'rgba(236, 72, 153, 0.15)',
-  },
-  likeCount: {
-    color: PurePulseTheme.colors.textMuted,
-    fontSize: 11,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: PurePulseTheme.colors.cardBg,
-    borderTopWidth: 1,
-    borderTopColor: PurePulseTheme.colors.cardBorder,
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: PurePulseTheme.colors.cardBgSecondary,
-    color: '#FFF',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    fontSize: 13,
-  },
-  sendBtn: {
-    backgroundColor: PurePulseTheme.colors.primary,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-  dmContainer: {
-    padding: 16,
-  },
-  sectionTitle: {
-    ...PurePulseTheme.typography.h3,
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  dmCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: PurePulseTheme.colors.cardBg,
-    padding: 14,
-    borderRadius: PurePulseTheme.radii.lg,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: PurePulseTheme.colors.cardBorder,
-  },
-  forumList: {
-    padding: 16,
-  },
-  forumCard: {
-    backgroundColor: PurePulseTheme.colors.cardBg,
-    borderRadius: PurePulseTheme.radii.lg,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: PurePulseTheme.colors.cardBorder,
-  },
-  forumCategoryTag: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-  },
-  forumCategoryText: {
-    color: PurePulseTheme.colors.accentBlue,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  forumPostTitle: {
-    ...PurePulseTheme.typography.h3,
-    fontSize: 15,
-    marginBottom: 6,
-  },
-  forumPostSnippet: {
-    color: PurePulseTheme.colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  forumFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  authorName: {
-    color: PurePulseTheme.colors.textMuted,
-    fontSize: 11,
-  },
-  forumStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statText: {
-    color: PurePulseTheme.colors.textMuted,
-    fontSize: 11,
-    marginLeft: 4,
-  }
+  root: { flex: 1, backgroundColor: PurePulseTheme.colors.background }, tabs: { flexDirection: 'row', margin: 16, marginBottom: 4, padding: 5, borderRadius: 12, backgroundColor: PurePulseTheme.colors.cardBg }, tab: { flex: 1, minWidth: 0, flexDirection: 'row', gap: 5, justifyContent: 'center', alignItems: 'center', paddingVertical: 9, borderRadius: 9 }, selected: { backgroundColor: PurePulseTheme.colors.primary }, tabLabel: { color: PurePulseTheme.colors.textSecondary, fontSize: 12, fontWeight: '700' }, white: { color: '#fff', fontWeight: '700' }, secondaryText: { color: PurePulseTheme.colors.primaryLight, fontSize: 11, fontWeight: '700' }, ribbon: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 }, chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: PurePulseTheme.colors.cardBorder, backgroundColor: PurePulseTheme.colors.cardBg, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20, maxWidth: 165 }, outlined: { borderColor: PurePulseTheme.colors.primaryLight }, muted: { color: PurePulseTheme.colors.textMuted, fontSize: 11 }, heading: { color: PurePulseTheme.colors.textPrimary, fontSize: 17, fontWeight: '800', marginHorizontal: 16, marginVertical: 8 }, messages: { padding: 16, paddingTop: 5, gap: 9, flexGrow: 1 }, message: { flexDirection: 'row', backgroundColor: PurePulseTheme.colors.cardBg, borderWidth: 1, borderColor: PurePulseTheme.colors.cardBorder, borderRadius: 13, padding: 12 }, avatar: { width: 34, height: 34, borderRadius: 17, marginRight: 9 }, avatarSmall: { width: 24, height: 24, borderRadius: 12 }, messageText: { flex: 1, minWidth: 0 }, name: { color: PurePulseTheme.colors.textPrimary, fontSize: 12, fontWeight: '700', marginBottom: 4 }, body: { color: PurePulseTheme.colors.textSecondary, fontSize: 13, lineHeight: 19 }, empty: { minHeight: 150, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 }, composer: { flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: 1, borderColor: PurePulseTheme.colors.cardBorder }, composerInput: { flex: 1, color: PurePulseTheme.colors.textPrimary, backgroundColor: PurePulseTheme.colors.cardBg, borderRadius: 12, paddingHorizontal: 13 }, send: { width: 42, height: 42, borderRadius: 21, backgroundColor: PurePulseTheme.colors.primary, justifyContent: 'center', alignItems: 'center' }, posts: { padding: 16, gap: 12 }, card: { backgroundColor: PurePulseTheme.colors.cardBg, borderWidth: 1, borderColor: PurePulseTheme.colors.cardBorder, borderRadius: 14, padding: 14, gap: 10 }, input: { color: PurePulseTheme.colors.textPrimary, borderWidth: 1, borderColor: PurePulseTheme.colors.cardBorder, borderRadius: 10, padding: 11 }, multiline: { minHeight: 88, textAlignVertical: 'top' }, publish: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: PurePulseTheme.colors.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9 }, postTitle: { color: PurePulseTheme.colors.textPrimary, fontSize: 16, fontWeight: '800' }, author: { flexDirection: 'row', alignItems: 'center', gap: 7 }, commentButton: { flexDirection: 'row', alignItems: 'center', gap: 4 }, comments: { borderTopWidth: 1, borderColor: PurePulseTheme.colors.cardBorder, paddingTop: 10, gap: 9 }, comment: { flexDirection: 'row', gap: 8, padding: 9, borderRadius: 10, backgroundColor: PurePulseTheme.colors.cardBgSecondary }, commentComposer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });
