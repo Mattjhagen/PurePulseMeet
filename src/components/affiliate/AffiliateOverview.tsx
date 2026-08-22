@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   linkBoxHeader: {
     flexDirection: 'row',
-    justify.content: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
