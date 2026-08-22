@@ -8,10 +8,13 @@ import { BankDashboard } from './src/components/banking/BankDashboard';
 import { AffiliateOverview } from './src/components/affiliate/AffiliateOverview';
 import { SocialCampaignStudio } from './src/components/affiliate/SocialCampaignStudio';
 import { PrintableAssetsHub } from './src/components/affiliate/PrintableAssetsHub';
+import { AuthModal } from './src/components/auth/AuthModal';
 import { initialUserProfile } from './src/services/mockData';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'huddles' | 'community' | 'banking' | 'affiliate' | 'campaigns' | 'printables'>('huddles');
+  const [authModalVisible, setAuthModalVisible] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -41,10 +44,10 @@ export default function App() {
             <Text style={styles.communityHeaderBtnText}>Join Huddles</Text>
           </TouchableOpacity>
 
-          <View style={styles.userAvatarWrap}>
+          <TouchableOpacity onPress={() => setAuthModalVisible(true)} style={styles.userAvatarWrap}>
             <Image source={{ uri: initialUserProfile.avatarUrl }} style={styles.userAvatar} />
             <View style={styles.onlineBadge} />
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -134,6 +137,16 @@ export default function App() {
           <Text style={[styles.tabLabel, activeTab === 'printables' && styles.tabLabelActive]}>Flyers</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Auth Modal for 1-Tap Google & Apple OAuth */}
+      <AuthModal
+        visible={authModalVisible}
+        onClose={() => setAuthModalVisible(false)}
+        onLoginSuccess={() => {
+          setIsLoggedIn(true);
+          setAuthModalVisible(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
