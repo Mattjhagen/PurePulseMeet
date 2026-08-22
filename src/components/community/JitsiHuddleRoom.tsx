@@ -1,24 +1,37 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Image, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Image, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { PurePulseTheme } from '../../theme/theme';
 import { HuddleRoomInfo } from '../../types';
-import { sampleHuddles } from '../../services/mockData';
+import { fetchHuddleRooms, getCurrentUserProfile } from '../../services/api';
 
 export const JitsiHuddleRoom: React.FC = () => {
-  const [huddles, setHuddles] = useState<HuddleRoomInfo[]>(sampleHuddles);
+  const [huddles, setHuddles] = useState<HuddleRoomInfo[]>([]);
   const [activeRoom, setActiveRoom] = useState<HuddleRoomInfo | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCamOff, setIsCamOff] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const startNewHuddle = () => {
+  useEffect(() => {
+    loadHuddles();
+  }, []);
+
+  const loadHuddles = async () => {
+    setLoading(true);
+    const rooms = await fetchHuddleRooms();
+    setHuddles(rooms);
+    setLoading(false);
+  };
+
+  const startNewHuddle = async () => {
+    const profile = await getCurrentUserProfile();
     const roomId = `PurePulseHuddle-${Date.now().toString().slice(-4)}`;
     const newRoom: HuddleRoomInfo = {
       id: `huddle-${Date.now()}`,
       title: 'Impromptu Coaching & Deal Huddle',
-      hostName: 'Matty Hagen (You)',
-      hostAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      hostName: `${profile.name} (You)`,
+      hostAvatar: profile.avatarUrl,
       participantsCount: 1,
       isLive: true,
       jitsiRoomUrl: `https://meet.jit.si/${roomId}`,
@@ -48,50 +61,56 @@ export const JitsiHuddleRoom: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollList} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionHeader}>Active & Upcoming Rooms</Text>
-        {huddles.map((room) => (
-          <View key={room.id} style={[styles.roomCard, room.isLive && styles.roomCardLive]}>
-            <View style={styles.roomHeader}>
-              <View style={styles.categoryPill}>
-                <Text style={styles.categoryText}>{room.category}</Text>
-              </View>
-              {room.isLive ? (
-                <View style={styles.pulseContainer}>
-                  <Text style={styles.liveText}>● LIVE NOW</Text>
+      {loading ? (
+        <View style={styles.centerBox}>
+          <ActivityIndicator size="large" color={PurePulseTheme.colors.primaryLight} />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollList} showsVerticalScrollIndicator={false}>
+          <Text style={styles.sectionHeader}>Active & Upcoming Rooms</Text>
+          {huddles.map((room) => (
+            <View key={room.id} style={[styles.roomCard, room.isLive && styles.roomCardLive]}>
+              <View style={styles.roomHeader}>
+                <View style={styles.categoryPill}>
+                  <Text style={styles.categoryText}>{room.category}</Text>
                 </View>
-              ) : (
-                <Text style={styles.endedText}>Scheduled</Text>
-              )}
-            </View>
-
-            <Text style={styles.roomTitle}>{room.title}</Text>
-
-            <View style={styles.hostRow}>
-              <Image source={{ uri: room.hostAvatar }} style={styles.hostAvatar} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.hostLabel}>Hosted by</Text>
-                <Text style={styles.hostName}>{room.hostName}</Text>
+                {room.isLive ? (
+                  <View style={styles.pulseContainer}>
+                    <Text style={styles.liveText}>● LIVE NOW</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.endedText}>Scheduled</Text>
+                )}
               </View>
 
-              <View style={styles.participantTag}>
-                <Ionicons name="people-outline" size={14} color={PurePulseTheme.colors.textSecondary} />
-                <Text style={styles.participantCount}>{room.participantsCount} in room</Text>
-              </View>
-            </View>
+              <Text style={styles.roomTitle}>{room.title}</Text>
 
-            <TouchableOpacity
-              style={[styles.joinBtn, !room.isLive && styles.joinBtnDisabled]}
-              onPress={() => setActiveRoom(room)}
-            >
-              <Ionicons name="enter-outline" size={18} color="#FFF" />
-              <Text style={styles.joinBtnText}>
-                {room.isLive ? 'Join Jitsi Meeting' : 'Open Room'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </ScrollView>
+              <View style={styles.hostRow}>
+                <Image source={{ uri: room.hostAvatar }} style={styles.hostAvatar} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.hostLabel}>Hosted by</Text>
+                  <Text style={styles.hostName}>{room.hostName}</Text>
+                </View>
+
+                <View style={styles.participantTag}>
+                  <Ionicons name="people-outline" size={14} color={PurePulseTheme.colors.textSecondary} />
+                  <Text style={styles.participantCount}>{room.participantsCount} in room</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.joinBtn, !room.isLive && styles.joinBtnDisabled]}
+                onPress={() => setActiveRoom(room)}
+              >
+                <Ionicons name="enter-outline" size={18} color="#FFF" />
+                <Text style={styles.joinBtnText}>
+                  {room.isLive ? 'Join Jitsi Meeting' : 'Open Room'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
+      )}
 
       {/* Jitsi Meeting Modal */}
       {activeRoom && (
@@ -170,6 +189,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: PurePulseTheme.colors.background,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bannerContainer: {
     backgroundColor: PurePulseTheme.colors.cardBg,

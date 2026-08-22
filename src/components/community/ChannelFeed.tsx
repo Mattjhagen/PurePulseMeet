@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PurePulseTheme } from '../../theme/theme';
 import { ChannelMessage, ForumPost } from '../../types';
-import { sampleChannelMessages, sampleForumPosts } from '../../services/mockData';
+import { fetchChannelMessages, sendChannelMessage, subscribeToChannelMessages, getCurrentUserProfile } from '../../services/api';
+import { sampleForumPosts } from '../../services/mockData';
 
 export const ChannelFeed: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'channels' | 'dms' | 'forum'>('channels');
   const [activeChannel, setActiveChannel] = useState<string>('wins-and-success');
-  const [messages, setMessages] = useState<ChannelMessage[]>(sampleChannelMessages);
+  const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [inputText, setInputText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState({ name: 'Partner', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150' });
   const [forumPosts, setForumPosts] = useState<ForumPost[]>(sampleForumPosts);
 
   const channels = [
@@ -19,23 +22,57 @@ export const ChannelFeed: React.FC = () => {
     { id: 'announcements', name: '📢 announcements' },
   ];
 
-  const sendMessage = () => {
+  useEffect(() => {
+    loadUserAndMessages();
+  }, [activeChannel]);
+
+  const loadUserAndMessages = async () => {
+    setLoading(true);
+    const profile = await getCurrentUserProfile();
+    setUserProfile({ name: profile.name, avatarUrl: profile.avatarUrl });
+
+    const liveMessages = await fetchChannelMessages(activeChannel);
+    setMessages(liveMessages);
+    setLoading(false);
+
+    // Subscribe to realtime updates for this channel
+    const subscription = subscribeToChannelMessages(activeChannel, (newMsg) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  };
+
+  const handleSend = async () => {
     if (!inputText.trim()) return;
 
-    const newMsg: ChannelMessage = {
-      id: `msg-${Date.now()}`,
+    const content = inputText.trim();
+    setInputText('');
+
+    // Optimistic UI update
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: ChannelMessage = {
+      id: tempId,
       channelId: activeChannel,
-      senderName: 'Matty Hagen',
-      senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-      senderRole: 'Silver Partner',
-      content: inputText.trim(),
+      senderName: userProfile.name,
+      senderAvatar: userProfile.avatarUrl,
+      senderRole: 'Partner',
+      content,
       timestamp: 'Just now',
       likesCount: 0,
-      hasLiked: false,
     };
 
-    setMessages([...messages, newMsg]);
-    setInputText('');
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    const sent = await sendChannelMessage(activeChannel, content, userProfile.name, userProfile.avatarUrl);
+    if (sent) {
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? sent : m)));
+    }
   };
 
   const toggleLike = (id: string) => {
@@ -53,22 +90,6 @@ export const ChannelFeed: React.FC = () => {
       })
     );
   };
-
-  const toggleForumLike = (id: string) => {
-    setForumPosts((prev) =>
-      prev.map((p) => {
-        if (p.id === id) {
-          return {
-            ...p,
-            likesCount: p.likesCount + 1,
-          };
-        }
-        return p;
-      })
-    );
-  };
-
-  const filteredMessages = messages.filter((m) => m.channelId === activeChannel);
 
   return (
     <View style={styles.container}>
@@ -117,35 +138,47 @@ export const ChannelFeed: React.FC = () => {
           </ScrollView>
 
           {/* Messages Feed */}
-          <ScrollView contentContainerStyle={styles.messagesList} showsVerticalScrollIndicator={false}>
-            {filteredMessages.map((msg) => (
-              <View key={msg.id} style={styles.messageBubble}>
-                <Image source={{ uri: msg.senderAvatar }} style={styles.avatar} />
-                <View style={{ flex: 1 }}>
-                  <View style={styles.msgHeader}>
-                    <Text style={styles.senderName}>{msg.senderName}</Text>
-                    {msg.senderRole && (
-                      <View style={styles.roleBadge}>
-                        <Text style={styles.roleText}>{msg.senderRole}</Text>
-                      </View>
-                    )}
-                    <Text style={styles.timestamp}>{msg.timestamp}</Text>
-                  </View>
-                  <Text style={styles.msgContent}>{msg.content}</Text>
+          {loading ? (
+            <View style={styles.centerBox}>
+              <ActivityIndicator size="large" color={PurePulseTheme.colors.primaryLight} />
+            </View>
+          ) : messages.length === 0 ? (
+            <View style={styles.centerBox}>
+              <Ionicons name="chatbubble-ellipses-outline" size={48} color={PurePulseTheme.colors.textMuted} />
+              <Text style={styles.emptyTitle}>No messages yet in #{activeChannel}</Text>
+              <Text style={styles.emptySub}>Be the first partner to start the conversation!</Text>
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={styles.messagesList} showsVerticalScrollIndicator={false}>
+              {messages.map((msg) => (
+                <View key={msg.id} style={styles.messageBubble}>
+                  <Image source={{ uri: msg.senderAvatar }} style={styles.avatar} />
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.msgHeader}>
+                      <Text style={styles.senderName}>{msg.senderName}</Text>
+                      {msg.senderRole && (
+                        <View style={styles.roleBadge}>
+                          <Text style={styles.roleText}>{msg.senderRole}</Text>
+                        </View>
+                      )}
+                      <Text style={styles.timestamp}>{msg.timestamp}</Text>
+                    </View>
+                    <Text style={styles.msgContent}>{msg.content}</Text>
 
-                  <View style={styles.msgFooter}>
-                    <TouchableOpacity
-                      style={[styles.likeBtn, msg.hasLiked && styles.likeBtnActive]}
-                      onPress={() => toggleLike(msg.id)}
-                    >
-                      <Ionicons name={msg.hasLiked ? 'heart' : 'heart-outline'} size={14} color={msg.hasLiked ? '#EC4899' : PurePulseTheme.colors.textMuted} />
-                      <Text style={[styles.likeCount, msg.hasLiked && { color: '#EC4899' }]}>{msg.likesCount}</Text>
-                    </TouchableOpacity>
+                    <View style={styles.msgFooter}>
+                      <TouchableOpacity
+                        style={[styles.likeBtn, msg.hasLiked && styles.likeBtnActive]}
+                        onPress={() => toggleLike(msg.id)}
+                      >
+                        <Ionicons name={msg.hasLiked ? 'heart' : 'heart-outline'} size={14} color={msg.hasLiked ? '#EC4899' : PurePulseTheme.colors.textMuted} />
+                        <Text style={[styles.likeCount, msg.hasLiked && { color: '#EC4899' }]}>{msg.likesCount}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-              </View>
-            ))}
-          </ScrollView>
+              ))}
+            </ScrollView>
+          )}
 
           {/* Input Bar */}
           <View style={styles.inputContainer}>
@@ -157,9 +190,9 @@ export const ChannelFeed: React.FC = () => {
               onChangeText={setInputText}
               maxLength={500}
               returnKeyType="send"
-              onSubmitEditing={sendMessage}
+              onSubmitEditing={handleSend}
             />
-            <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
+            <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
               <Ionicons name="send" size={16} color="#FFF" />
             </TouchableOpacity>
           </View>
@@ -174,20 +207,9 @@ export const ChannelFeed: React.FC = () => {
             <View style={{ flex: 1 }}>
               <View style={styles.msgHeader}>
                 <Text style={styles.senderName}>Matty Hagen (Founder)</Text>
-                <Text style={styles.timestamp}>12m ago</Text>
+                <Text style={styles.timestamp}>Online</Text>
               </View>
-              <Text style={styles.msgContent} numberOfLines={1}>Hey Matty! Let me know if you need help with your next 3 referral prospects.</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.dmCard}>
-            <Image source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80' }} style={styles.avatarLarge} />
-            <View style={{ flex: 1 }}>
-              <View style={styles.msgHeader}>
-                <Text style={styles.senderName}>Sarah Vance (Gold Coach)</Text>
-                <Text style={styles.timestamp}>1h ago</Text>
-              </View>
-              <Text style={styles.msgContent} numberOfLines={1}>That tear-off poster strategy works wonders for coffee shops! Check out my forum post.</Text>
+              <Text style={styles.msgContent} numberOfLines={1}>Welcome to PurePulse Partner Hub! Direct messaging is active.</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -213,13 +235,6 @@ export const ChannelFeed: React.FC = () => {
                 <View style={styles.forumStats}>
                   <Ionicons name="chatbox-ellipses-outline" size={14} color={PurePulseTheme.colors.textMuted} />
                   <Text style={styles.statText}>{post.repliesCount}</Text>
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}
-                    onPress={() => toggleForumLike(post.id)}
-                  >
-                    <Ionicons name="heart-outline" size={14} color={PurePulseTheme.colors.primaryLight} />
-                    <Text style={[styles.statText, { color: PurePulseTheme.colors.primaryLight }]}>{post.likesCount}</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -294,6 +309,24 @@ const styles = StyleSheet.create({
   messagesList: {
     paddingHorizontal: 16,
     paddingBottom: 16,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  emptyTitle: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 15,
+    marginTop: 12,
+  },
+  emptySub: {
+    color: PurePulseTheme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
   },
   messageBubble: {
     flexDirection: 'row',

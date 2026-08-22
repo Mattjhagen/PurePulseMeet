@@ -1,20 +1,38 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PurePulseTheme } from '../../theme/theme';
 import { VirtualCardView } from './VirtualCardView';
 import { TierProgression } from './TierProgression';
 import { StripePayoutModal } from './StripePayoutModal';
-import { initialUserProfile, initialBankingAccount, samplePayoutLedger } from '../../services/mockData';
-import { PayoutTransaction } from '../../types';
+import { PayoutTransaction, BankingAccount, UserProfile } from '../../types';
+import { fetchBankingAccount, fetchPayoutTransactions, getCurrentUserProfile } from '../../services/api';
 
 export const BankDashboard: React.FC = () => {
-  const [profile, setProfile] = useState(initialUserProfile);
-  const [account, setAccount] = useState(initialBankingAccount);
-  const [ledger, setLedger] = useState<PayoutTransaction[]>(samplePayoutLedger);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [account, setAccount] = useState<BankingAccount | null>(null);
+  const [ledger, setLedger] = useState<PayoutTransaction[]>([]);
   const [payoutModalVisible, setPayoutModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadBankingData();
+  }, []);
+
+  const loadBankingData = async () => {
+    setLoading(true);
+    const user = await getCurrentUserProfile();
+    const bankData = await fetchBankingAccount();
+    const txHistory = await fetchPayoutTransactions();
+
+    setProfile(user);
+    setAccount(bankData);
+    setLedger(txHistory);
+    setLoading(false);
+  };
 
   const handleCashoutSuccess = (cashoutAmount: number) => {
+    if (!account) return;
     const newTx: PayoutTransaction = {
       id: `tx-${Math.floor(1000 + Math.random() * 9000)}`,
       amount: cashoutAmount,
@@ -29,6 +47,14 @@ export const BankDashboard: React.FC = () => {
     });
     setLedger([newTx, ...ledger]);
   };
+
+  if (loading || !profile || !account) {
+    return (
+      <View style={styles.centerBox}>
+        <ActivityIndicator size="large" color={PurePulseTheme.colors.primaryLight} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentList} showsVerticalScrollIndicator={false}>
@@ -80,21 +106,25 @@ export const BankDashboard: React.FC = () => {
       {/* Payout History Ledger */}
       <View style={styles.ledgerSection}>
         <Text style={styles.ledgerTitle}>Recent Payout History</Text>
-        {ledger.map((tx: PayoutTransaction) => (
-          <View key={tx.id} style={styles.ledgerRow}>
-            <View style={styles.txIconContainer}>
-              <Ionicons name="arrow-up-circle-outline" size={22} color={PurePulseTheme.colors.success} />
+        {ledger.length === 0 ? (
+          <Text style={styles.emptyLedgerText}>No payout transactions yet.</Text>
+        ) : (
+          ledger.map((tx: PayoutTransaction) => (
+            <View key={tx.id} style={styles.ledgerRow}>
+              <View style={styles.txIconContainer}>
+                <Ionicons name="arrow-up-circle-outline" size={22} color={PurePulseTheme.colors.success} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.txDestination}>{tx.destination}</Text>
+                <Text style={styles.txDate}>{tx.date}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.txAmount}>+${tx.amount.toFixed(2)}</Text>
+                <Text style={styles.txStatus}>{tx.status}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.txDestination}>{tx.destination}</Text>
-              <Text style={styles.txDate}>{tx.date}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.txAmount}>+${tx.amount.toFixed(2)}</Text>
-              <Text style={styles.txStatus}>{tx.status}</Text>
-            </View>
-          </View>
-        ))}
+          ))
+        )}
       </View>
 
       {/* Stripe Cashout Modal */}
@@ -116,6 +146,11 @@ const styles = StyleSheet.create({
   contentList: {
     padding: 16,
     paddingBottom: 32,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerRow: {
     flexDirection: 'row',
@@ -188,6 +223,11 @@ const styles = StyleSheet.create({
     ...PurePulseTheme.typography.h3,
     fontSize: 15,
     marginBottom: 12,
+  },
+  emptyLedgerText: {
+    color: PurePulseTheme.colors.textMuted,
+    fontSize: 12,
+    paddingVertical: 12,
   },
   ledgerRow: {
     flexDirection: 'row',

@@ -1,28 +1,53 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as WebBrowser from 'expo-web-browser';
 import { PurePulseTheme } from '../../theme/theme';
-import { initialUserProfile, initialBankingAccount } from '../../services/mockData';
+import { UserProfile } from '../../types';
+import { getCurrentUserProfile } from '../../services/api';
 
 export const AffiliateOverview: React.FC = () => {
   const [copied, setCopied] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    setLoading(true);
+    const u = await getCurrentUserProfile();
+    setProfile(u);
+    setLoading(false);
+  };
 
   const copyReferralLink = async () => {
-    await Clipboard.setStringAsync(initialUserProfile.referralLink);
+    if (!profile) return;
+    await Clipboard.setStringAsync(profile.referralLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const copyPartnerCode = async () => {
-    await Clipboard.setStringAsync(initialUserProfile.partnerCode);
-    Alert.alert('Copied!', `Partner code ${initialUserProfile.partnerCode} copied to clipboard.`);
+    if (!profile) return;
+    await Clipboard.setStringAsync(profile.partnerCode);
+    Alert.alert('Copied!', `Partner code ${profile.partnerCode} copied to clipboard.`);
   };
 
   const openTestLink = async () => {
-    await WebBrowser.openBrowserAsync(initialUserProfile.referralLink);
+    if (!profile) return;
+    await WebBrowser.openBrowserAsync(profile.referralLink);
   };
+
+  if (loading || !profile) {
+    return (
+      <View style={styles.centerBox}>
+        <ActivityIndicator size="large" color={PurePulseTheme.colors.primaryLight} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentList} showsVerticalScrollIndicator={false}>
@@ -48,7 +73,7 @@ export const AffiliateOverview: React.FC = () => {
 
         <View style={styles.linkRow}>
           <Text style={styles.linkUrlText} numberOfLines={1}>
-            {initialUserProfile.referralLink}
+            {profile.referralLink}
           </Text>
           <TouchableOpacity style={[styles.copyBtn, copied && styles.copyBtnActive]} onPress={copyReferralLink}>
             <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={14} color="#FFF" />
@@ -61,7 +86,7 @@ export const AffiliateOverview: React.FC = () => {
         <View style={styles.codeRow}>
           <View>
             <Text style={styles.boxLabel}>PARTNER CODE</Text>
-            <Text style={styles.partnerCodeVal}>{initialUserProfile.partnerCode}</Text>
+            <Text style={styles.partnerCodeVal}>{profile.partnerCode}</Text>
           </View>
           <TouchableOpacity style={styles.copyCodeBtn} onPress={copyPartnerCode}>
             <Ionicons name="copy-outline" size={16} color={PurePulseTheme.colors.textSecondary} />
@@ -101,6 +126,11 @@ const styles = StyleSheet.create({
   contentList: {
     padding: 16,
     paddingBottom: 32,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   promoBanner: {
     backgroundColor: 'rgba(124, 58, 237, 0.15)',
@@ -144,7 +174,7 @@ const styles = StyleSheet.create({
   },
   linkBoxHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justify.content: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },

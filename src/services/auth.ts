@@ -1,14 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as QueryParams from 'expo-auth-session';
-import { Constants } from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-supabase-url.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://cucksfwkdmrkeiwmdlut.supabase.co';
+export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1Y2tzZndrZG1ya2Vpd21kbHV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxMDc5MzUsImV4cCI6MjA1NTY4MzkzNX0.0Y49eXkH7mN1K4L5P2V7X9A3Z6M8L0P2V7X9A3Z6M8L';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: undefined,
     autoRefreshToken: true,

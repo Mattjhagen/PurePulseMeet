@@ -1,98 +1,137 @@
-# PurePulse Meet & Partner Banking App
+# PurePulse Partner Hub - Mobile Application (iOS & Android)
 
-An all-in-one cross-platform mobile application (built with Expo, React Native, and TypeScript) for **PurePulse** affiliates combining:
-- 🎥 **Teams & Slack-Style Collaboration Hub**: Live audio/video meeting rooms (powered by Jitsi Meet), group chat channels, strategy forums, and 1-on-1 coaching DMs.
-- 💳 **DoorDash/Uber-Style Affiliate Banking**: Pilot-inspired financial dashboard, tier progression gamification (Bronze to Black Card), interactive debit card preview, and Stripe Connect Express instant payouts.
-- 🎨 **Affiliate Studio & Marketing Hub**: Unique referral link generator (`MATTY193`), 1:1 / 9:16 / 16:9 social graphic studio with custom headline hooks, pre-written high-converting copy, and printable flyer previews.
+Welcome to the **PurePulse Partner Hub** mobile codebase! This cross-platform mobile application is built with **Expo / React Native**, **Supabase (Auth, Postgres, Realtime WebSockets)**, **Stripe Connect Express**, and **Jitsi Meet**.
 
 ---
 
-## 🚀 Features Implemented
+## 📱 Features & Capabilities
 
-### 1. Teams & Coaching Huddles Hub
-- **Jitsi Meet Live Rooms**: Impromptu video/audio coaching huddles (`JitsiHuddleRoom.tsx`) with room controls (Mute, Camera toggle, Raise Hand, Leave Room).
-- **Slack-Style Group Channels**: Realtime chat feeds for `#wins-and-success`, `#general`, `#coaching-deals`, and `#announcements` (`ChannelFeed.tsx`).
-- **Coaching DMs & Strategy Forum**: Direct 1-on-1 messaging with coaches/founders and threaded strategy boards for objection handling.
-
-### 2. Gamified Partner Banking & Payouts (Pilot-Inspired)
-- **Financial Command Center**: Real-time counters for Available Cashout Balance, Accruing MRR, Pending Commissions, and Lifetime Paid Out (`BankDashboard.tsx`).
-- **Interactive Partner Card**: Dynamic virtual debit card view (`VirtualCardView.tsx`) featuring tier status, partner code, metallic foil gradient background, and chip graphic.
-- **Tier Progression Gamification**: 5-tier ladder (Bronze -> Silver -> Gold -> Platinum -> PurePulse Black Card) with milestone progress bars and perk unlocks (`TierProgression.tsx`).
-- **Stripe Connect Cashout Drawer**: 1-tap instant debit card cashouts (1-5 min) & standard direct deposit setup (`StripePayoutModal.tsx`).
-
-### 3. PurePulse Affiliate & Campaign Studio
-- **Referral Link & Code Hub**: 1-tap copy for unique referral link (`https://login.purepulse.one/ref/MATTY193`), test link launcher, and active client MRR tracking (`AffiliateOverview.tsx`).
-- **Social Campaign Studio**: Dynamic 1:1 Square, 9:16 Story, and 16:9 Banner graphic previews with editable headline hooks (`SocialCampaignStudio.tsx`).
-- **1-Click Pre-Written Copy**: High-converting social post scripts ready to copy and share.
-- **Printable Assets Hub**: Full-page Letter 8.5x11 flyer previews for Signature Dark Neon, Studio Clean Light, Local Business ROI, and 10-Tab Tear-Off Posters (`PrintableAssetsHub.tsx`).
+- **📹 Live Video & Audio Coaching Huddles:** Embedded Jitsi Meet video rooms (`https://meet.jit.si/`) with mic/camera toggles, hand raising, and live founder Q&A.
+- **💬 Real-Time Channels & Direct Messages:** Slack-style channels (`#wins-and-success`, `#general`, `#coaching-deals`, `#announcements`) powered by Supabase Realtime WebSockets.
+- **💳 DoorDash-Style Affiliate Banking:** Interactive metallic partner debit card, accrued MRR counter, pending commissions, and 1-tap Stripe instant cashout drawer.
+- **🏆 5-Tier Partner Gamification:** Tier progression ladder (Bronze ➔ Silver ➔ Gold ➔ Platinum ➔ PurePulse Black Card) with milestone progress bars.
+- **🎨 Social Campaign & Asset Studio:** Custom 1:1, 9:16 vertical, and 16:9 graphic previews with 1-click copy outreach scripts and partner referral link (`MATTY193`).
+- **📄 Printable Asset Hub:** Full-page Letter 8.5x11 flyer templates, business cards, and tear-off posters featuring unique partner QR codes.
 
 ---
 
-## 🛠️ Getting Started & Local Setup
+## 🛠️ Tech Stack & Architecture
 
-### Prerequisites
-- Node.js (v18 or higher)
-- Expo CLI (`npm install -g expo-cli` or `npx expo`)
-- Expo Go app on your iOS or Android device (or Xcode Simulator / Android Studio Emulator)
+- **Frontend Framework:** React Native 0.76.6 / Expo SDK 52
+- **Backend & Auth:** Supabase Auth (Google OAuth & Apple Sign-In) + Postgres DB
+- **Realtime Sync:** Supabase Realtime WebSocket Subscriptions (`postgres_changes`)
+- **Payments & Payouts:** Stripe Connect Express
+- **Video Meetings:** React Native WebView + Jitsi Meet (`meet.jit.si`)
+- **CI/CD Build System:** Expo Application Services (EAS Build & Submit)
 
-### Installation
+---
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/Mattjhagen/PurePulseMeet.git
-cd PurePulseMeet
+## ⚙️ Backend & Database Wiring Guide
 
-# 2. Install dependencies
-npm install
+### 1. Supabase Database Schema
+The app connects to Supabase instance: `https://cucksfwkdmrkeiwmdlut.supabase.co`.
 
-# 3. Start the Expo development server
-npx expo start
+Execute the following database migration (`027_purepulse_meet_and_gamification.sql`) inside your Supabase SQL Editor:
+
+```sql
+-- 1. Extend affiliates table
+ALTER TABLE public.affiliates
+ADD COLUMN IF NOT EXISTS tier text DEFAULT 'Silver',
+ADD COLUMN IF NOT EXISTS tier_progress integer DEFAULT 45,
+ADD COLUMN IF NOT EXISTS available_balance numeric DEFAULT 450.00,
+ADD COLUMN IF NOT EXISTS pending_commissions numeric DEFAULT 125.00,
+ADD COLUMN IF NOT EXISTS lifetime_earnings numeric DEFAULT 2480.00,
+ADD COLUMN IF NOT EXISTS monthly_recurring numeric DEFAULT 840.00,
+ADD COLUMN IF NOT EXISTS active_clients integer DEFAULT 12,
+ADD COLUMN IF NOT EXISTS link_clicks integer DEFAULT 342,
+ADD COLUMN IF NOT EXISTS stripe_account_id text,
+ADD COLUMN IF NOT EXISTS avatar_url text;
+
+-- 2. Create huddle_rooms table
+CREATE TABLE IF NOT EXISTS public.huddle_rooms (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  host_name text NOT NULL,
+  host_avatar text,
+  participants_count integer DEFAULT 1,
+  is_live boolean DEFAULT true,
+  jitsi_room_url text NOT NULL,
+  category text DEFAULT 'Deal Coaching',
+  created_at timestamptz DEFAULT now()
+);
+
+-- 3. Create channel_messages table
+CREATE TABLE IF NOT EXISTS public.channel_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  channel_id text NOT NULL,
+  sender_name text NOT NULL,
+  sender_avatar text,
+  sender_role text DEFAULT 'Partner',
+  content text NOT NULL,
+  likes_count integer DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
+-- 4. Create payout_transactions table
+CREATE TABLE IF NOT EXISTS public.payout_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  affiliate_id uuid REFERENCES public.affiliates(id),
+  amount numeric NOT NULL,
+  status text DEFAULT 'Completed',
+  destination text DEFAULT 'Stripe Instant Cashout',
+  created_at timestamptz DEFAULT now()
+);
+
+-- 5. Enable Realtime on Chat & Huddles
+ALTER PUBLICATION supabase_realtime ADD TABLE public.channel_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.huddle_rooms;
 ```
 
-- Press `i` to launch in iOS Simulator
-- Press `a` to launch in Android Emulator
-- Press `w` to open web preview in browser
+---
+
+## 🔐 OAuth Configuration (Google & Apple)
+
+### 🍏 Apple Sign-In (Supabase Auth Setup)
+1. Go to **Supabase Dashboard** ➔ **Auth** ➔ **Providers** ➔ **Apple**.
+2. Set **Services ID**: `one.purepulse.partner.sid`
+3. Set **Apple Team ID**: `WZMXKCK98R`
+4. Set **Key ID**: `7Q56FF5CGW`
+5. Paste the generated Apple Client Secret JWT (generated via `node scripts/generate_apple_secret.js`).
+
+### 🌐 Google OAuth
+1. Go to **Google Cloud Console** ➔ **OAuth 2.0 Client IDs**.
+2. Add Authorized Redirect URI: `https://cucksfwkdmrkeiwmdlut.supabase.co/auth/v1/callback`.
+3. In Supabase Dashboard, paste **Client ID** & **Client Secret**.
 
 ---
 
-## 📋 What You Need to Do on Your End (Production Checklist)
+## 💳 Stripe Connect Express Instant Cashouts
 
-To connect the app to your live backend infrastructure, follow these steps:
-
-### 1. Supabase Setup (Database, Realtime & Auth)
-1. Create a Supabase project at [supabase.com](https://supabase.com).
-2. Create `.env` file in root:
-   ```env
-   EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   ```
-3. Run SQL migration script for tables: `channel_messages`, `direct_messages`, `forum_posts`, and `huddle_rooms`.
-
-### 2. Stripe Connect Express Integration (Affiliate Payouts)
-1. Activate **Stripe Connect** in your Stripe Dashboard (`dashboard.stripe.com/connect`).
-2. Set account type to **Express** (recommended so Stripe securely handles affiliate KYC and 1099 tax forms).
-3. Set your publishable key in `.env`:
-   ```env
-   EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_your_key
-   ```
-4. Deploy a serverless endpoint (Vercel / Supabase Edge Functions) to handle `/api/create-express-account` and `/api/payout`.
-
-### 3. Jitsi Meet Server Configuration
-- By default, the app connects to public Jitsi Meet rooms (`https://meet.jit.si/PurePulseCoaching-...`).
-- If you run your own self-hosted Jitsi instance or 8x8 Jitsi as a Service (JaaS), update `jitsiRoomUrl` in `src/components/community/JitsiHuddleRoom.tsx`.
-
-### 4. Push Notifications (Expo + FCM / APNs)
-1. Configure **Expo Notifications** in `app.json` with your Apple Developer Team ID and Firebase Cloud Messaging server key.
-2. Test push alerts for channel mentions, new DMs, and instant payout confirmations.
-
-### 5. Resend Email Notifications
-- Add your `RESEND_API_KEY` to send instant email receipts whenever an affiliate triggers a cashout or achieves a new tier level.
+To wire real-time instant cashouts:
+1. In `purepulse-admin`, set up a Next.js API route `/api/stripe/create-connect-account` to generate Stripe Connect onboarding links for affiliates.
+2. When an affiliate taps **Instant Cashout** in the app, the app triggers a transfer via Stripe API (`stripe.transfers.create` or `stripe.payouts.create` with `method: 'instant'`).
+3. Store completed payout records in `public.payout_transactions` table to update the mobile ledger in real-time.
 
 ---
 
-## 🔮 Future Feature Roadmap
+## 🚀 Building & Submitting with EAS CLI
 
-- [ ] **Native LiveKit / WebRTC SDK Migration**: Support background audio streaming so affiliates can listen to live coaching huddles while using other apps.
-- [ ] **Physical Card Issuing via Stripe Issuing**: Allow Gold+ partners to request an official physical metallic PurePulse Black Debit Card mailed to their address.
-- [ ] **Leaderboards & Monthly Contests**: Live leaderboard tab ranking top affiliates by MRR generated each month with cash prize pools.
-- [ ] **In-App Deep Linking**: Support `purepulse://huddle/<id>` links so push notifications launch users directly into a live coaching room.
+### 1. Build Standalone Direct-Install Android APK
+```bash
+eas build --platform android --profile preview
+```
+
+### 2. Build Production iOS (.ipa) & Android (.aab)
+```bash
+EXPO_NO_CAPABILITY_SYNC=1 eas build --platform all --profile production
+```
+
+### 3. Submit to Apple App Store Connect
+```bash
+eas submit --platform ios
+```
+
+---
+
+## 📄 License & Ownership
+Copyright © 2026 PurePulse Inc. All rights reserved.
